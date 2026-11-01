@@ -1,0 +1,19 @@
+Generadores de los assets provisionales (Python 3 + Pillow, numpy, scipy y ffmpeg).
+  python3 exportar3d.py -> fondos (salas en perspectiva de punto de fuga central), cámaras CCTV y
+                           scripts/nucleo/zonas_fondos.gd (polígonos clicables, cuadro en la cámara del laboratorio)
+  python3 exportar.py   -> la mancha y el cuadro provisionales en assets/sprites
+  python3 audio.py      -> audio .ogg en assets/audio
+  python3 sangre.py     -> assets/sprites/sangre_sabes_quien_soy.png (texto de sangre del final del modo 3)
+Motor: persp.py (caja 3D proyectada con un punto de fuga). Las salas están en salas3d.py: cada puerta/objeto
+se coloca en metros sobre una pared (decal "I" izquierda, "D" derecha, frontal = pared del fondo).
+Si cambias una puerta de sitio, vuelve a ejecutar exportar3d.py: las zonas clicables se regeneran solas.
+Puedes sustituir cualquier archivo de assets/ por arte propio con el mismo nombre (y editar zonas_fondos.gd a mano).
+Esta carpeta lleva .gdignore: Godot no la importa.
+
+FONDOS FOTORREALISTAS (actuales)
+  python3 importar_fondos.py CARPETA_ORIGINALES  -> fondos, cam_1/cam_2 (filtro verde), monitores de Vigilancia, ventana_recepcion (sin plantas) y habitacion_secreta(_sentada)
+                                                    Carpeta de originales: los 9 fondos + hab_tumbada, hab_sentada, ventana_recepcion (las puertas NO se tiñen)
+  python3 importar_personaje.py espaldas.png silla.png -> assets/sprites/alicia_de_espaldas.png y alicia_sentada.png
+  python3 importar_detector.py detector.png       -> assets/sprites/detector.png (LCD en blanco)
+  Las zonas clicables de estos fondos se escriben a mano en scripts/nucleo/zonas_fondos.gd (exportar3d.py ya no se usa para ellas).
+  python3 audio.py detector_bip                    -> assets/audio/detector_bip.ogg (pitido del detector)
