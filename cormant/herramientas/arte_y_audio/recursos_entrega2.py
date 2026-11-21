@@ -1,7 +1,7 @@
 """Genera:
   assets/sprites/alicia_perfil.png  -> Alicia de perfil, recortada al cuerpo (fondo negro a transparente) y volteada
                                        para que mire a la derecha (en el laboratorio está a la izquierda).
-  assets/fondos/pasillo_mancha.png  -> fondo del pasillo con la anomalía de la sangre (1280x720).
+  assets/fondos/pasillo_macabro.png  -> fondo macabro del pasillo (anomalía de la mancha) (1280x720).
 Uso: python3 recursos_entrega2.py   (lee fuentes/alicia_perfil_fuente.png y fuentes/pasillo_mancha_fuente.png)"""
 import os
 import numpy as np, cv2
@@ -40,7 +40,7 @@ def perfil():
 def fondo():
     img = cv2.imread(os.path.join(AQUI, "fuentes", "pasillo_mancha_fuente.png"), cv2.IMREAD_COLOR)
     img = cv2.resize(img, (1280, 720), interpolation=cv2.INTER_AREA)
-    dst = os.path.join(RAIZ, "fondos", "pasillo_mancha.png")
+    dst = os.path.join(RAIZ, "fondos", "pasillo_macabro.png")
     cv2.imwrite(dst, img)
     print("ok fondo", dst)
 

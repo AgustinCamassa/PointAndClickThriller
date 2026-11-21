@@ -131,7 +131,7 @@ func _initialize() -> void:
 	director.fijas["mancha"] = true
 	escena._mostrar_sala("pasillo")
 	await create_timer(0.5).timeout
-	root.get_viewport().get_texture().get_image().save_png("%s/anom_pasillo_mancha.png" % salida)
+	root.get_viewport().get_texture().get_image().save_png("%s/anom_pasillo_macabro.png" % salida)
 	director.fijas.erase("mancha")
 	director.parpadeo_restante = 3.0
 	escena._mostrar_sala("vigilancia")

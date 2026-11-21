@@ -19,11 +19,17 @@ const NUM_GLIFOS := 5
 const VISIBLE_GLIFO := 30.0        # un glifo resuelto se desvanece pasado este tiempo (valor provisional)
 ## Andrómeda (la protagonista) es el 5.º glifo (la oficina de la sala 5, donde reaparece al morir) solo en el modo 1; en los modos 2 y 3 se sortean los 5 glifos por igual. En el modo 1 los otros 4 se sortean en cada partida.
 const GLIFO_FIJO := "andromeda"
+## Partida guía (solo modo 1, la primera que se juega): el glifo de la 2.ª posición (el del cuadro) es Ofiuco.
+## Si el jugador muere en esa partida, el resto se sortea como siempre.
+const GLIFO_GUIA := "ofiuco"
+const GLIFO_GUIA_POS := 1
+var guia_activa := false          # la partida en curso es la guía
+var guia_hecha := false           # ya se jugó la partida guía (se guarda en el progreso)
 ## Modos de juego (valores provisionales). El 2 se desbloquea al superar el 1 y el 3 al superar el 2 (en cualquiera de sus vidas).
 ##  sombra: "suma" (la sombra no esquivada suma compatibilidad), "mata" (muerte instantánea) o "pasos"
 ##  (modo 3: se oyen sus pasos cada 4 anomalías, en cualquier sala; hay que mantener el clic 1 s dentro de una ventana de 2 s).
 ##  bloqueo_glifo: segundos de bloqueo del terminal del laboratorio al equivocarse de glifo (además se reinicia lo confirmado).
-##  entidad_fase: segundos que dura cada fase de la entidad de la ventana (3 fases; se acorta en cada reaparición, ver Director). Modo 3: 0,5 s por fase = 1,5 s para reaccionar.
+##  entidad_fase: segundos que dura cada fase de la entidad de la ventana (3 fases; se acorta en cada reaparición, ver Director). Modo 3: 0,6667 s por fase = 2 s para reaccionar.
 ##  apagon_rondas: rondas de anomalías (una ronda = una vuelta completa de la bolsa) entre apagones entre el 60 y el 80 % de compatibilidad
 ##  (con 80 % o más es una por ronda en todos los modos); apagon_duracion: segundos que dura el apagón.
 ##  penaliza_glifo: compatibilidad que suma ese error (0 en el modo 3, que empieza al 99 %: sumaría 5 y mataría).
@@ -34,9 +40,9 @@ const MODOS := {
 	2: {"nombre": "Vigilancia estricta", "duracion_evento": 35.0, "max_activos": 5, "ventana_aviso": 3.5, "ocultarse": 2.5,
 		"sombra": "mata", "suma_sombra": 0.0, "compat_inicial": 0.0, "compat_tras_morir": 80.0, "tramo_minimo": 0, "muertes_iniciales": 0, "parpadeo_penaliza": true, "parpadeo_factor": 1.0,
 		"bloqueo_glifo": 45.0, "penaliza_glifo": 5.0, "entidad_fase": 1.0, "apagon_rondas": 2, "apagon_duracion": 5.0},
-	3: {"nombre": "Sesión roja", "duracion_evento": 35.0, "max_activos": 5, "ventana_aviso": 2.0, "ocultarse": 1.0,
+	3: {"nombre": "Sesión roja", "duracion_evento": 35.0, "max_activos": 5, "ventana_aviso": 3.0, "ocultarse": 1.0,
 		"sombra": "pasos", "suma_sombra": 0.0, "compat_inicial": 99.0, "compat_tras_morir": 99.0, "tramo_minimo": 3, "muertes_iniciales": 1, "parpadeo_penaliza": false, "parpadeo_factor": 2.0,
-		"bloqueo_glifo": 60.0, "penaliza_glifo": 0.0, "entidad_fase": 0.5, "apagon_rondas": 1, "apagon_duracion": 2.5},
+		"bloqueo_glifo": 60.0, "penaliza_glifo": 0.0, "entidad_fase": 0.6667, "apagon_rondas": 1, "apagon_duracion": 2.5},
 }
 const SOMBRA_CADA := 4              # modo 3: anomalías entre una sombra y la siguiente
 const COMPATIBILIDAD_MAXIMA := 100.0   # llegar a este valor mata en todos los modos
@@ -110,9 +116,41 @@ func cfg(clave: String):
 	return MODOS[modo][clave]
 
 
+## Rellena los glifos desde la posición `desde` (las anteriores ya están fijadas). En el modo 1, Andrómeda es siempre la 5.ª;
+## con `guia`, Ofiuco ocupa la posición del cuadro.
+func _sortear_glifos(desde: int, guia: bool) -> void:
+	var base: Array = Glifos.REALES.duplicate()
+	if modo == 1:
+		base.erase(GLIFO_FIJO)
+	var libres: Array = []
+	for g in base:
+		if not glifos.slice(0, desde).has(g):
+			libres.append(g)
+	libres.shuffle()
+	if guia and desde <= GLIFO_GUIA_POS:
+		libres.erase(GLIFO_GUIA)
+	for i in range(desde, NUM_GLIFOS):
+		if modo == 1 and i == NUM_GLIFOS - 1:
+			glifos[i] = GLIFO_FIJO
+		elif guia and i == GLIFO_GUIA_POS:
+			glifos[i] = GLIFO_GUIA
+		else:
+			glifos[i] = libres.pop_back()
+
+
+## Tras una muerte, la partida guía deja de serlo: lo que aún no se ha pedido se sortea como en cualquier partida.
+func fin_guia_por_muerte() -> void:
+	if not guia_activa:
+		return
+	guia_activa = false
+	_sortear_glifos(solicitados, false)
+	glifos_cambiado.emit()
+
+
 func cargar_progreso() -> void:
 	var f := ConfigFile.new()
 	if f.load(ruta_progreso) == OK:
+		guia_hecha = bool(f.get_value("progreso", "guia_hecha", false))
 		modo_desbloqueado = clampi(int(f.get_value("progreso", "modo_desbloqueado", 1)), 1, MODOS.size())
 		estrellas.clear()
 		for id in f.get_value("progreso", "estrellas", []):
@@ -123,6 +161,7 @@ func cargar_progreso() -> void:
 func guardar_progreso() -> void:
 	var f := ConfigFile.new()
 	f.set_value("progreso", "modo_desbloqueado", modo_desbloqueado)
+	f.set_value("progreso", "guia_hecha", guia_hecha)
 	f.set_value("progreso", "estrellas", estrellas)
 	f.save(ruta_progreso)
 
@@ -195,15 +234,13 @@ func nueva_partida() -> void:
 	pin = []
 	for i in 4:
 		pin.append(randi() % 10)
-	var sorteados: Array = Glifos.REALES.duplicate()
-	if modo == 1:
-		sorteados.erase(GLIFO_FIJO)
-	sorteados.shuffle()
+	guia_activa = modo == 1 and not guia_hecha
+	if guia_activa:
+		guia_hecha = true
+		guardar_progreso()
 	glifos.clear()
-	for g in sorteados:
-		glifos.append(g)
-	if modo == 1:
-		glifos.append(GLIFO_FIJO)
+	glifos.resize(NUM_GLIFOS)
+	_sortear_glifos(0, guia_activa)
 	jugando = true
 	partida_nueva.emit()
 	if tramo > 0:

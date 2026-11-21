@@ -87,8 +87,6 @@ func _mostrar_sala(id: String) -> void:
 	_construir_zonas(datos, textura != null)
 	_construir_alicia(datos)
 	_refrescar_anomalias()
-	if id == "pasillo" and Director.mancha_visible():
-		_titilar_luces()
 	_actualizar_musica(datos)
 	Interfaz.sala_cambiada()
 	Director.entrar_sala(id)
@@ -124,13 +122,13 @@ func _construir_fondo(datos: Dictionary, textura: Texture2D) -> void:
 
 
 func _construir_zonas(datos: Dictionary, con_fondo_real: bool) -> void:
-	var con_mancha := EstadoJuego.sala_actual == "pasillo" and Director.mancha_visible()
+	var con_mancha := EstadoJuego.sala_actual == "pasillo" and Director.macabro("pasillo")
 	for h in datos["hotspots"]:
-		if con_mancha and not ZonasFondos.poligono("pasillo_mancha", h["id"]).is_empty():
+		if con_mancha and not ZonasFondos.poligono("pasillo_macabro", h["id"]).is_empty():
 			# Con el fondo manchado las puertas están en otro sitio.
 			h = h.duplicate()
-			h["poly"] = ZonasFondos.poligono("pasillo_mancha", h["id"])
-			h["rect"] = ZonasFondos.rect("pasillo_mancha", h["id"])
+			h["poly"] = ZonasFondos.poligono("pasillo_macabro", h["id"])
+			h["rect"] = ZonasFondos.rect("pasillo_macabro", h["id"])
 		if h["rect"].size == Vector2.ZERO:
 			continue
 		var b := ZonaPoligono.new()
@@ -275,18 +273,6 @@ func _destello_cambio() -> void:
 		_fondo_tr.modulate = Color.WHITE
 
 
-func _titilar_luces() -> void:
-	## Al entrar al pasillo con la sangre: el fondo parpadea como luces que fallan (unos 2,5 s).
-	var id_sala := sala_id
-	for v in [0.35, 1.0, 0.6, 1.0, 0.15, 0.9, 0.4, 1.0]:
-		if sala_id != id_sala or not is_instance_valid(_fondo_tr):
-			return
-		_fondo_tr.modulate = Color(v, v, v, 1.0)
-		await get_tree().create_timer(randf_range(0.1, 0.4)).timeout
-	if is_instance_valid(_fondo_tr) and sala_id == id_sala:
-		_fondo_tr.modulate = Color.WHITE
-
-
 func _anomalia_silueta_ventana(_rect: Rect2) -> void:
 	## La entidad tras el cristal, en la fase en la que va: cuerpo entero lejos, de la cintura y de los hombros hacia arriba.
 	## Se recorta al cristal para que, al acercarse, el cuerpo «salga» por debajo del marco.
@@ -315,9 +301,6 @@ func _geometria_entidad(fase: int) -> Dictionary:
 
 
 func _textura_sala(id: String) -> Texture2D:
-	## Pasillo con la anomalía de la sangre: su propio fondo (sustituye a la mancha del suelo).
-	if id == "pasillo" and Director.mancha_visible():
-		return Recursos.fondo("pasillo_mancha")
 	## Con una anomalía, el fondo macabro de la sala (si lo hay; en el modo 3, al revés: macabro siempre salvo con la anomalía); con el apagón, la versión oscurecida del que toque
 	## (luces apagadas, pantallas negras); si no existe, la normal.
 	var base := id
@@ -469,10 +452,12 @@ func _viajar(destino: String) -> void:
 func _funcion(nombre: String) -> void:
 	match nombre:
 		"cuadro":
+			var macabro := Director.cuadro_macabro()
 			if Director.cuadro_con_anomalia():
 				Interfaz.mensaje("El cuadro ha cambiado. Ya no posan: cinco están caídos y una sigue de pie.", 4.5)
 			else:
 				Interfaz.mensaje("Un cuadro: seis personas posando en un laboratorio antiguo.", 3.5)
+			_abrir(PanelCuadro.crear(macabro))
 		"pc_senal":
 			# Sin el glifo pedido y esquivado, el ordenador no tiene señal; con él, muestra la figura.
 			if Director.glifo_recepcion_visible():
@@ -533,8 +518,11 @@ func _abrir_panel(nombre: String) -> void:
 
 func _abrir(panel: PanelBase) -> void:
 	_panel_abierto = panel
+	if panel.es_ordenador:
+		Director.ordenador_abierto = true   # la entidad de la ventana no avanza mientras se mira un ordenador
 	panel.cerrado.connect(func():
 		_panel_abierto = null
+		Director.ordenador_abierto = false
 		Interfaz.set_panel_abierto(false))
 	_capa_modales.add_child(panel)
 	Interfaz.set_panel_abierto(true)
@@ -553,6 +541,9 @@ func _volver_atras() -> void:
 	var destino := DatosSalas.volver_a(sala_id)
 	if destino != "":
 		_viajar(destino)
+	elif DatosSalas.volver_bloqueado(sala_id):
+		# Solo se avanza: la puerta por la que se entró ya no se puede abrir.
+		Interfaz.mensaje("La puerta de la habitación se ha bloqueado.", 3.5)
 
 
 ## DEV (K): tras el 5.º glifo, salta directo al documento final (como tras «acceso concedido»).

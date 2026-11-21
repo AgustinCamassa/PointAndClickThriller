@@ -190,7 +190,7 @@ func _initialize() -> void:
 	estado.nueva_partida(); estado.vigilancia_abierta = true; estado.tiene_tarjeta = true
 	comprobar(is_equal_approx(estado.compatibilidad, 99.0) and estado.filtro_rojo() and estado.tramo == 3, "modo 3: 99 %, modo rojo y último tramo")
 	comprobar(director.maximo_activos() == 5 and is_equal_approx(director.duracion_evento(), 35.0), "modo 3: 35 s y 5 activas")
-	comprobar(is_equal_approx(director.ventana_aviso(), 2.0) and is_equal_approx(director.ocultarse_necesario(), 1.0), "modo 3: ventana de 2 s y 1 s mantenido")
+	comprobar(is_equal_approx(director.ventana_aviso(), 3.0) and is_equal_approx(director.ocultarse_necesario(), 1.0), "modo 3: ventana de 3 s y 1 s mantenido")
 	director.proximo_aviso = 0.05
 	avanzar(0.5)
 	comprobar(not director.advertencia_activa, "modo 3: no hay sombra por el 60 %")
@@ -207,7 +207,7 @@ func _initialize() -> void:
 	director.detener_entidad()   # aquí se prueba la sombra de advertencia, no el golpe de la silueta
 	director._quitar_entidad()   # (sombra y entidad no atacan a la vez: la entidad ya terminó)
 	avanzar(0.3)
-	comprobar(director.advertencia_activa and director.aviso_restante > 1.0 and director.aviso_restante <= 2.0, "modo 3: la 4.ª anomalía, en el pasillo, trae a la entidad con 2 s")
+	comprobar(director.advertencia_activa and director.aviso_restante > 2.0 and director.aviso_restante <= 3.0, "modo 3: la 4.ª anomalía, en el pasillo, trae a la entidad con 3 s")
 	director.mantener(true)
 	avanzar(0.6)
 	comprobar(director.advertencia_activa, "modo 3: con 0,6 s mantenidos aún no basta")
@@ -225,7 +225,7 @@ func _initialize() -> void:
 	director.mantener(true)
 	avanzar(0.5)
 	director.mantener(false)    # suelta antes del segundo: se reinicia la cuenta de ocultación
-	avanzar(2.0)
+	avanzar(3.0)
 	comprobar(estado.muertes == 2 and not estado.jugando, "modo 3: no mantener 1 s seguido en 2 s es game over")
 	estado.nueva_partida(); estado.vigilancia_abierta = true; estado.tiene_tarjeta = true
 	director.anomalias_desde_sombra = 0
@@ -421,7 +421,7 @@ func _initialize() -> void:
 	var salas = load("res://scripts/nucleo/datos_salas.gd")
 	comprobar(salas.volver_a("pasillo") == "recepcion" and salas.volver_a("vigilancia") == "pasillo", "volver desde pasillo y vigilancia")
 	comprobar(salas.volver_a("laboratorio") == "pasillo" and salas.volver_a("oficina") == "laboratorio", "volver desde laboratorio y oficina")
-	comprobar(salas.volver_a("recepcion") == "" and salas.volver_a("habitacion_secreta") == "" and salas.volver_a("pasillo_alterado") == "", "sin vuelta atrás en el inicio, la habitación y el 14-B")
+	comprobar(salas.volver_a("recepcion") == "" and salas.volver_a("habitacion_secreta") == "" and salas.volver_a("pasillo_alterado") == "", "sin vuelta atrás en el inicio, la habitación y el pasillo alterado")
 
 	print("== Libreta de objetivos y detector de señales")
 	var interfaz = root.get_node("Interfaz")
@@ -637,7 +637,7 @@ func _initialize() -> void:
 
 	print("== Pasillo manchado: puertas en su sitio")
 	for z in ["puerta_vigilancia", "puerta_bloq1", "puerta_bloq2", "puerta_lab"]:
-		comprobar(not ZonasFondos.poligono("pasillo_mancha", z).is_empty() and ZonasFondos.poligono("pasillo_mancha", z) != ZonasFondos.poligono("pasillo", z), "zona %s propia del fondo manchado" % z)
+		comprobar(not ZonasFondos.poligono("pasillo_macabro", z).is_empty() and ZonasFondos.poligono("pasillo_macabro", z) != ZonasFondos.poligono("pasillo", z), "zona %s propia del fondo manchado" % z)
 
 	print("== Documento final por bloques")
 	var tapado: String = Textos.tapar(Textos.BLOQUE_B)
@@ -798,9 +798,9 @@ func _initialize() -> void:
 	director.entidad_apariciones = 20
 	director.silueta_visible = false
 	director.forzar("silueta")
-	comprobar(is_equal_approx(director._silueta_restante, 0.4), "modo 3: aunque acorte, la fase nunca baja de 0,4 s (1,2 s en total)")
+	comprobar(is_equal_approx(director._silueta_restante, 0.6667 * 0.65), "modo 3: aunque acorte (65 %), cada fase dura 0,433 s (1,3 s en total)")
 	director.detener_entidad(); avanzar(2.0)
-	comprobar(absf(float(estado.MODOS[3]["entidad_fase"]) * 3.0 - 1.5) < 0.01, "modo 3: 1,5 s para reaccionar a la silueta")
+	comprobar(absf(float(estado.MODOS[3]["entidad_fase"]) * 3.0 - 2.0) < 0.01, "modo 3: 2 s para reaccionar a la silueta")
 	estado.modo = 1
 	estado.nueva_partida(); estado.vigilancia_abierta = true; estado.tiene_tarjeta = true
 	estado.muertes = 1
@@ -986,10 +986,11 @@ func _initialize() -> void:
 	print("   hijos capa anomalías: ", escena._capa_anomalias.get_child_count(), " sala=", escena.sala_id, " vis=", director.silueta_visible)
 	comprobar(escena._capa_anomalias.get_child_count() == 1, "la entidad aparece en el fondo de Vigilancia (recortada al cristal)")
 	director.silueta_visible = false
+	estado.modo = 1   # pasillo con la sangre en modo 1 (en el modo 3 se invierte)
 	director.fijas["mancha"] = true
 	escena._mostrar_sala("pasillo")
 	await process_frame
-	comprobar(escena._fondo_tr.texture == root.get_node("Recursos").fondo("pasillo_mancha"), "pasillo con la sangre: fondo de sangre")
+	comprobar(escena._fondo_tr.texture == root.get_node("Recursos").fondo("pasillo_macabro"), "pasillo con la anomalía de la mancha: fondo macabro")
 	director.fijas.erase("mancha")
 	estado.modo = 1   # los fondos macabros de esta parte son los de los modos 1 y 2 (en el 3 se invierten)
 	director.fijas["cuadro"] = true
@@ -1033,7 +1034,18 @@ func _initialize() -> void:
 	director.silueta_visible = true
 	comprobar(not director.macabro("recepcion") and not director.macabro("ventana_recepcion"), "modo 3: con la silueta, recepción y ventana normales")
 	director.silueta_visible = false
-	comprobar(director.macabro("pasillo") == false, "modo 3: el pasillo no usa fondo macabro")
+	# Ordenador abierto: la silueta de la ventana no avanza (espera a la vista de la sala)
+	director.silueta_visible = true; director.entidad_fase = 1; director._silueta_restante = 0.5
+	director.ordenador_abierto = true
+	avanzar(1.0)
+	comprobar(director.entidad_fase == 1 and director._silueta_restante == 0.5 and director.silueta_visible, "con un ordenador abierto la silueta no ataca")
+	director.ordenador_abierto = false
+	director.silueta_visible = false
+	comprobar(director.macabro("pasillo"), "modo 3: el pasillo va macabro sin anomalía")
+	comprobar(director.macabro("pasillo") and not director.mancha_en_camara() == false, "modo 3: pasillo manchado sin anomalía (CAM 2 también)")
+	director.fijas["mancha"] = true
+	comprobar(not director.macabro("pasillo"), "modo 3: con la mancha, pasillo normal")
+	director.fijas.erase("mancha")
 	estado.modo = 1
 	escena.queue_free()
 	await process_frame
@@ -1306,5 +1318,22 @@ func _initialize() -> void:
 		fin.queue_free()
 		await process_frame
 
+	print("== Partida guía (modo 1, la primera sin morir)")
+	estado.modo_desbloqueado = 1
+	estado.guia_hecha = false
+	estado.modo = 1
+	estado.nueva_partida()
+	comprobar(estado.glifos[1] == "ofiuco" and estado.glifos[4] == "andromeda" and estado.guia_activa, "primera partida modo 1: Ofiuco en la 2.ª posición y Andrómeda 5.ª")
+	comprobar(estado.guia_hecha, "la guía queda marcada como hecha")
+	estado.muertes += 1
+	estado.fin_guia_por_muerte()
+	comprobar(not estado.guia_activa and estado.glifos[4] == "andromeda", "tras morir la guía termina y Andrómeda sigue 5.ª")
+	estado.nueva_partida()
+	comprobar(not estado.guia_activa and estado.glifos[1] != "" and estado.glifos[4] == "andromeda", "la segunda partida no es guía")
+	var repetidos := false
+	for g in estado.glifos:
+		if estado.glifos.count(g) > 1:
+			repetidos = true
+	comprobar(not repetidos, "sin glifos repetidos en la partida sorteada")
 	print("== Resultado: ", "TODO OK" if fallos == 0 else "%d FALLOS" % fallos)
 	quit(fallos)

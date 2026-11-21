@@ -2,7 +2,7 @@ class_name PanelVentana
 extends PanelBase
 ## Ventanas de cristal unidireccional.
 ##  - "recepcion": desde Vigilancia, zona de entrada de la recepción (se ve la silueta).
-##  - "secreta": desde la Oficina, el pasillo secreto con la puerta morada y su placa.
+##  - "secreta": desde la Oficina, el pasillo secreto con la puerta morada.
 
 var tipo := "recepcion"
 var _silueta: Alicia
@@ -140,26 +140,6 @@ func _puerta_morada() -> void:
 		puerta.position = origen + rp.position
 		puerta.size = rp.size
 		contenido.add_child(puerta)
-	# Placa colgada sobre la puerta (el fondo no la lleva dibujada).
-	var rpl := ZonasFondos.rect("pasillo_secreto", "placa")
-	if EstadoJuego.muertes == 0:
-		return   # antes de morir la puerta no lleva placa ni texto
-	var fondo_placa := ColorRect.new()
-	fondo_placa.color = Color(0.1, 0.11, 0.1, 0.92)
-	fondo_placa.position = origen + rpl.position
-	fondo_placa.size = rpl.size
-	fondo_placa.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	contenido.add_child(fondo_placa)
-	var placa := Label.new()
-	placa.position = fondo_placa.position
-	placa.size = rpl.size
-	placa.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	placa.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	placa.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	placa.add_theme_font_size_override("font_size", 12)
-	placa.add_theme_color_override("font_color", Color(0.78, 0.8, 0.7))
-	placa.text = "14-B"
-	contenido.add_child(placa)
 
 
 func _al_cambiar_silueta(visible_: bool) -> void:

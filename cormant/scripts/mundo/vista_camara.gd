@@ -254,9 +254,9 @@ func _dibujar_pasillo(fuente: Font) -> void:
 	var centro := _centro_mancha()
 	if Director.mancha_en_camara():
 		# La anomalía de la sangre es el fondo entero del pasillo también en esta cámara.
-		var fondo_mancha := Recursos.fondo("pasillo_mancha")
+		var fondo_mancha := Recursos.fondo("pasillo_macabro")
 		if fondo_mancha != null:
-			draw_texture_rect(_en_verde(fondo_mancha, "pasillo_mancha"), Rect2(Vector2.ZERO, size), false)
+			draw_texture_rect(_en_verde(fondo_mancha, "pasillo_macabro"), Rect2(Vector2.ZERO, size), false)
 		if Director.evento_de("mancha") != null and int(_t * 3.0) % 2 == 0:
 			_marca_aviso(fuente, centro + Vector2(ancho * 0.6, -size.y * 0.12))
 	elif EstadoJuego.glifo_visible("mancha"):

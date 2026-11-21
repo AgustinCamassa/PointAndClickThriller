@@ -23,6 +23,7 @@ FONDOS FOTORREALISTAS (actuales)
   python3 audio.py pitidos_4 ... pitidos_9        -> assets/audio/pitidos_N.ogg (CAM 3: N pitidos = N estrellas de la constelación)
   python3 constelaciones.py --escribir            -> regenera PUNTOS/LINEAS de las 6 constelaciones reales (4-9 estrellas) en glifos.gd
   python3 importar_macabros.py CARPETA_ORIGINALES  -> fondos <sala>_macabro, cam_1_macabro y los cuadros (alinea, gradúa el color y repinta monitores)
+  python3 ventana_en_vigilancia.py                -> pega ventana_recepcion(_macabro) en el cristal de vigilancia(_macabro); ejecutar antes de fondos_apagon.py
   python3 fondos_apagon.py                        -> assets/fondos/*_apagon.png (fondos oscurecidos del apagón; no toca los originales)
   python3 audio.py apagon_inicio apagon_fin       -> assets/audio/apagon_inicio.ogg y apagon_fin.ogg (apagón)
   python3 audio.py tecla                          -> assets/audio/tecla.ogg (teclado del PIN)

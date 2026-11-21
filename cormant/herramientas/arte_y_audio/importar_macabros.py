@@ -135,23 +135,23 @@ def graduar_cuadro(img, ref_lab, params=None):
     return cv2.cvtColor(out, cv2.COLOR_LAB2BGR), params
 
 
-def con_marco(pintura):
+def con_marco(pintura, w=CUADRO_W, h=CUADRO_H, marco=MARCO):
     """Recorta la pintura a la proporción del marco, la escala y dibuja un marco oscuro con bisel."""
-    iw, ih = CUADRO_W - 2 * MARCO, CUADRO_H - 2 * MARCO
-    h, w = pintura.shape[:2]
-    alto = round(w * ih / iw)
-    y0 = max(0, (h - alto) // 2)
+    iw, ih = w - 2 * marco, h - 2 * marco
+    ph, pw = pintura.shape[:2]
+    alto = round(pw * ih / iw)
+    y0 = max(0, (ph - alto) // 2)
     p = cv2.resize(pintura[y0:y0 + alto], (iw, ih), interpolation=cv2.INTER_AREA)
-    out = np.zeros((CUADRO_H, CUADRO_W, 3), np.uint8)
+    out = np.zeros((h, w, 3), np.uint8)
     out[:] = (24, 26, 28)                                  # marco
-    cv2.rectangle(out, (0, 0), (CUADRO_W - 1, CUADRO_H - 1), (52, 55, 58), 1)    # bisel exterior claro
-    cv2.rectangle(out, (MARCO - 2, MARCO - 2), (CUADRO_W - MARCO + 1, CUADRO_H - MARCO + 1), (10, 11, 12), 1)  # sombra interior
-    out[MARCO:MARCO + ih, MARCO:MARCO + iw] = p
+    cv2.rectangle(out, (0, 0), (w - 1, h - 1), (52, 55, 58), 1)    # bisel exterior claro
+    cv2.rectangle(out, (marco - 2, marco - 2), (w - marco + 1, h - marco + 1), (10, 11, 12), 1)  # sombra interior
+    out[marco:marco + ih, marco:marco + iw] = p
     # viñeta suave dentro del cuadro (la luz de la sala no llega a las esquinas)
     yy, xx = np.mgrid[0:ih, 0:iw].astype(np.float32)
     r = np.sqrt(((xx - iw / 2) / (iw / 2)) ** 2 + ((yy - ih / 2) / (ih / 2)) ** 2)
     v = (1 - 0.32 * np.clip(r - 0.55, 0, 1))[..., None]
-    out[MARCO:MARCO + ih, MARCO:MARCO + iw] = (out[MARCO:MARCO + ih, MARCO:MARCO + iw] * v).astype(np.uint8)
+    out[marco:marco + ih, marco:marco + iw] = (out[marco:marco + ih, marco:marco + iw] * v).astype(np.uint8)
     return out
 
 
@@ -189,7 +189,23 @@ def main(orig, dest):
     guardar(sprites, "cuadro_macabro", con_marco(macabro))
 
 
+def main_cuadros_zoom(orig, dest):
+    """Versiones grandes de los dos cuadros (640x360) para la vista ampliada al hacer clic. No toca el resto de assets."""
+    sprites = os.path.join(dest, "sprites")
+    os.makedirs(sprites, exist_ok=True)
+    ref_lab = cv2.imread(os.path.join(dest, "fondos", "laboratorio.png"))
+    normal, params = graduar_cuadro(leer(orig, "cuadro"), ref_lab)
+    macabro, _ = graduar_cuadro(leer(orig, "cuadro_macabro"), ref_lab, params)
+    for nombre, img in [("cuadro_zoom", normal), ("cuadro_macabro_zoom", macabro)]:
+        out = con_marco(img, 640, 360, 14)
+        cv2.imwrite(os.path.join(sprites, nombre + ".png"), out, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+        print("  ", nombre, out.shape[1], "x", out.shape[0])
+
+
 if __name__ == "__main__":
     carpeta = sys.argv[1]
     destino = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets")
-    main(carpeta, destino)
+    if "--solo-cuadros-zoom" in sys.argv:
+        main_cuadros_zoom(carpeta, destino)
+    else:
+        main(carpeta, destino)

@@ -104,6 +104,7 @@ var _silueta_restante := 0.0         # tiempo que queda de la fase actual
 var entidad_parpadeo := 0.0          # >0: la entidad ha sido vista en detalle y desaparece entre parpadeos
 var entidad_doble := false           # tras esquivarla saliendo de la sala, su próxima aparición es el doble de probable
 var ventana_abierta := false         # el jugador está mirando por la ventana de Vigilancia (panel abierto)
+var ordenador_abierto := false       # el jugador está en la vista de un ordenador (cámaras, correo, PIN...): la silueta no avanza
 var glifo_recepcion := false      # hay un glifo trazado en la recepción (aparece al esquivar la silueta)
 var glifo_restante := 0.0         # segundos que le quedan visible tras esquivar la silueta
 var pitidos_glifo_falso := ""     # constelación cuyos pitidos suenan si el terminal no había pedido ese glifo
@@ -167,6 +168,7 @@ func reiniciar() -> void:
 	entidad_parpadeo = 0.0
 	entidad_doble = false
 	ventana_abierta = false
+	ordenador_abierto = false
 	glifo_recepcion = false
 	glifo_restante = 0.0
 	pitidos_escuchados = false
@@ -249,7 +251,6 @@ func cuadro_en_camara() -> bool:
 ## Modos 1 y 2, con la anomalía: laboratorio → cuadro real; recepción, reverso y ventana → silueta;
 ## Vigilancia → mientras dura el parpadeo; oficina y pasillo de la sala 5 → el 5.º glifo (viento).
 ## Modo 3: lo mismo invertido (macabro siempre, normal con la anomalía).
-## El pasillo tiene su propia anomalía de fondo (`pasillo_mancha`) y no pasa por aquí.
 func macabro(fondo: String) -> bool:
 	var anomalia: bool
 	match fondo:
@@ -261,6 +262,8 @@ func macabro(fondo: String) -> bool:
 			anomalia = parpadeo_restante > 0.0
 		"oficina", "pasillo_secreto":
 			anomalia = EstadoJuego.armado("viento")
+		"pasillo":
+			anomalia = mancha_visible()
 		_:
 			return false
 	return anomalia != invertido()
@@ -275,7 +278,8 @@ func mancha_visible() -> bool:
 
 
 func mancha_en_camara() -> bool:
-	return fijas.has("mancha") or evento_de("mancha") != null
+	var senal := fijas.has("mancha") or evento_de("mancha") != null
+	return senal != invertido()
 
 
 func pitidos_activos() -> bool:
@@ -586,7 +590,7 @@ func _actualizar_silueta(delta: float) -> void:
 			entidad_parpadeo = 0.0
 			_quitar_entidad()
 		return
-	if ventana_abierta:
+	if ventana_abierta or ordenador_abierto:
 		return
 	_silueta_restante -= delta
 	if _silueta_restante > 0.0:
@@ -941,7 +945,7 @@ func _ignorada(e: Evento) -> void:
 		"cuadro":
 			texto = "Era real. El cuadro del laboratorio se queda torcido."
 		"mancha":
-			texto = "Era real. La mancha del pasillo se queda."
+			texto = "Era real. Lo del pasillo se queda."
 		"voz":
 			texto = "Era real. El susurro de la cámara 3 se queda."
 	mensaje.emit(texto)
@@ -953,7 +957,7 @@ func _texto_falsa_alarma(e: Evento) -> String:
 		"cuadro":
 			return "Falsa alarma: el cuadro estaba recto."
 		"mancha":
-			return "Falsa alarma: el suelo del pasillo estaba limpio."
+			return "Falsa alarma: el pasillo estaba igual."
 		"voz":
 			return "Falsa alarma: no había ningún susurro."
 	return "Falsa alarma."
@@ -974,13 +978,13 @@ func entrar_sala(id: String) -> void:
 			var m := evento_de("mancha")
 			if m != null:
 				if m.real:
-					m.pista = "Pasillo comprobado: hay una mancha en el suelo."
-					mensaje.emit("Hay una mancha oscura en el suelo del pasillo.")
+					m.pista = "Pasillo comprobado: algo ha cambiado."
+					mensaje.emit("Algo ha cambiado en el pasillo. Las paredes ya no son las mismas.")
 				else:
-					m.pista = "Pasillo comprobado: el suelo está limpio."
-					mensaje.emit("El suelo del pasillo está limpio.")
+					m.pista = "Pasillo comprobado: está igual."
+					mensaje.emit("El pasillo está igual que siempre.")
 			elif fijas.has("mancha"):
-				mensaje.emit("La mancha sigue ahí.")
+				mensaje.emit("Lo del pasillo sigue ahí.")
 		"oficina":
 			if EstadoJuego.quinto_disponible() and not EstadoJuego.armado("viento"):
 				mensaje.emit("Aquí no pasa nada. Falta pedir el último dato al terminal.")
@@ -1105,6 +1109,7 @@ func morir() -> void:
 		return
 	EstadoJuego.jugando = false
 	EstadoJuego.muertes += 1
+	EstadoJuego.fin_guia_por_muerte()
 	eventos.clear()
 	EstadoJuego.reiniciar_terminal()
 	var habia_apagon := apagon_restante > 0.0
@@ -1117,6 +1122,7 @@ func morir() -> void:
 	entidad_fase = 0
 	entidad_parpadeo = 0.0
 	ventana_abierta = false
+	ordenador_abierto = false
 	pitidos_restante = 0.0
 	viento_manchas_restante = 0.0
 	parpadeo_pendiente = false

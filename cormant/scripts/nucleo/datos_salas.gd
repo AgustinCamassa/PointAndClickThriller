@@ -20,7 +20,7 @@ static func _h(sala: String, id: String, etiqueta: String, accion: String, valor
 	}
 
 
-## Sala a la que lleva el botón «Volver» de la barra inferior ("" = no hay vuelta atrás: inicio, habitación y 14-B).
+## Sala a la que lleva el botón «Volver» de la barra inferior ("" = no hay vuelta atrás: inicio, habitación y pasillo alterado).
 const VOLVER_A := {
 	"recepcion_reverso": "recepcion",
 	"pasillo": "recepcion",
@@ -32,6 +32,14 @@ const VOLVER_A := {
 
 static func volver_a(sala: String) -> String:
 	return VOLVER_A.get(sala, "")
+
+
+## Salas donde «Volver» no lleva a ningún sitio y avisa de que la puerta está bloqueada (solo se avanza).
+const VOLVER_BLOQUEADO := ["pasillo_alterado"]
+
+
+static func volver_bloqueado(sala: String) -> bool:
+	return sala in VOLVER_BLOQUEADO
 
 
 static func nombre(id: String) -> String:
@@ -124,6 +132,8 @@ static func obtener(id: String) -> Dictionary:
 					_h("oficina", "puerta_azul", "Puerta azul", "funcion", "puerta_azul", AZUL),
 					_h("oficina", "tablero", "Tablón de avisos", "texto",
 						"Normas de seguridad y avisos de personal, unos sobre otros. Hay una chincheta sola, sin nada que sujetar.", OBJETO),
+					_h("oficina", "expediente", "Expediente", "texto",
+						"CASO 14-B · TRASLADO\n\nSujeto: ████████\nDestino: habitación segura\nAutorizado por: ████\nRetorno: no previsto\n\nAl margen, a lápiz: «Compatible. Mantener en observación.»", OBJETO),
 				],
 			}
 		"habitacion_secreta":
@@ -149,15 +159,12 @@ static func obtener(id: String) -> Dictionary:
 			}
 		"pasillo_alterado":
 			return {
-				"nombre": "Pasillo (14-B)",
+				"nombre": "Pasillo alterado",
 				"color": Color(0.12, 0.09, 0.09),
 				"musica": "ambiente_pasillo_alterado",
 				"hotspots": [
-					_h("pasillo_alterado", "placa", "Placa", "texto", "14-B", OBJETO),
 					_h("pasillo_alterado", "ventana", "Ventana", "texto",
 						"El cristal de la oficina, visto desde este lado. No hay nadie dentro.", OBJETO),
-					_h("pasillo_alterado", "puerta_morada", "Puerta morada", "texto",
-						"No quiero volver ahí.", MORADO),
 					_h("pasillo_alterado", "huellas", "Huellas", "texto",
 						"Huellas en el suelo, ya marcadas. Todas llevan a la puerta azul. No sé decir si son mías.", OBJETO),
 					_h("pasillo_alterado", "puerta_azul", "Puerta azul", "ir", "oficina", AZUL),

@@ -242,7 +242,7 @@ def main(orig, dest):
     hab_sentada = a1280(cargar(orig, "hab_sentada"))
     alt = a1280(cargar(orig, "pasillo_alterado"))
     alt = huellas(alt)
-    alt = placa_14b(alt)
+    # (sin placa: el número del caso no se ve en ninguna puerta ni pasillo)
     sec = a1280(cargar(orig, "pasillo_secreto"))
     ventana = ventana_recepcion(cargar(orig, "ventana_recepcion"))
     feed1 = feed_camara(lab, (80, 60, 1200, 620))

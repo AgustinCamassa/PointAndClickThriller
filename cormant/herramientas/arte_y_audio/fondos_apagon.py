@@ -16,7 +16,7 @@ FONDOS = {
     "laboratorio": [(494, 318, 742, 376)],
     "ventana_recepcion": [], "pasillo_secreto": [],
     # fondos macabros (importar_macabros.py): mismas pantallas que sus salas normales
-    "recepcion_macabro": [], "recepcion_reverso_macabro": [], "oficina_macabro": [], "pasillo_secreto_macabro": [],
+    "pasillo_macabro": [], "recepcion_macabro": [], "recepcion_reverso_macabro": [], "oficina_macabro": [], "pasillo_secreto_macabro": [],
     "ventana_recepcion_macabro": [],
     "vigilancia_macabro": [(386, 322, 850, 426)],
     "laboratorio_macabro": [(494, 318, 742, 376)],

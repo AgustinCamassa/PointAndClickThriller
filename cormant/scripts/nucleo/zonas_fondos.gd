@@ -23,15 +23,15 @@ const ZONAS := {
 		"puerta_bloq2": [Vector2(582, 290), Vector2(670, 290), Vector2(670, 468), Vector2(582, 468)],
 		"puerta_lab": [Vector2(910, 190), Vector2(984, 148), Vector2(984, 668), Vector2(920, 612)],
 	},
-	# El fondo del pasillo con la sangre (`pasillo_mancha`) es otro encuadre: sus puertas están en otro sitio.
-	"pasillo_mancha": {
+	# El fondo macabro del pasillo (`pasillo_macabro`) es otro encuadre: sus puertas están en otro sitio.
+	"pasillo_macabro": {
 		"puerta_vigilancia": [Vector2(262, 158), Vector2(340, 190), Vector2(340, 596), Vector2(262, 648)],
 		"puerta_bloq1": [Vector2(441, 252), Vector2(476, 266), Vector2(476, 502), Vector2(441, 522)],
 		"puerta_bloq2": [Vector2(598, 290), Vector2(684, 290), Vector2(684, 470), Vector2(598, 470)],
 		"puerta_lab": [Vector2(948, 192), Vector2(1034, 160), Vector2(1034, 640), Vector2(948, 598)],
 	},
 	"vigilancia": {
-		"puerta_pasillo": [Vector2(24, 108), Vector2(168, 182), Vector2(168, 636), Vector2(24, 716)],
+		"puerta_pasillo": [Vector2(37, 116), Vector2(168, 178), Vector2(168, 640), Vector2(37, 716)],
 		"ventana": [Vector2(342, 138), Vector2(910, 138), Vector2(910, 318), Vector2(342, 318)],
 		"monitores": [Vector2(390, 324), Vector2(826, 324), Vector2(826, 424), Vector2(390, 424)],
 		"cuaderno": [Vector2(806, 424), Vector2(876, 424), Vector2(876, 442), Vector2(806, 442)],
@@ -50,28 +50,27 @@ const ZONAS := {
 		"mostrador": [Vector2(245, 402), Vector2(700, 402), Vector2(700, 555), Vector2(245, 555)],
 		"puerta_azul": [Vector2(800, 208), Vector2(914, 208), Vector2(914, 484), Vector2(800, 484)],
 		"tablero": [Vector2(45, 100), Vector2(245, 178), Vector2(245, 392), Vector2(45, 396)],
+		# Carpeta «Caso 14-B» sobre el mostrador (la hoja suelta); va después del mostrador para quedar encima.
+		"expediente": [Vector2(576, 388), Vector2(626, 388), Vector2(626, 411), Vector2(576, 411)],
 	},
 	"habitacion_secreta": {
 		"puerta_morada": [Vector2(538, 226), Vector2(674, 226), Vector2(674, 474), Vector2(538, 474)],
-		"reloj": [Vector2(426, 208), Vector2(484, 208), Vector2(484, 264), Vector2(426, 264)],
+		"reloj": [Vector2(427, 209), Vector2(481, 209), Vector2(481, 263), Vector2(427, 263)],
 		"calendario": [Vector2(731, 229), Vector2(799, 229), Vector2(799, 318), Vector2(731, 318)],
 		"mesita": [Vector2(0, 380), Vector2(214, 380), Vector2(214, 640), Vector2(0, 640)],
 		"ficha": [Vector2(38, 150), Vector2(98, 150), Vector2(98, 274), Vector2(38, 274)],
-		"monitor_pulso": [Vector2(304, 284), Vector2(372, 284), Vector2(372, 346), Vector2(304, 346)],
+		"monitor_pulso": [Vector2(296, 286), Vector2(370, 286), Vector2(370, 346), Vector2(296, 346)],
 		"gotero": [Vector2(236, 160), Vector2(300, 160), Vector2(300, 300), Vector2(236, 300)],
 		"camilla": [Vector2(842, 395), Vector2(1280, 372), Vector2(1280, 720), Vector2(1030, 720), Vector2(1010, 560), Vector2(845, 455)],
 	},
 	"pasillo_alterado": {
 		"puerta_azul": [Vector2(480, 306), Vector2(562, 306), Vector2(562, 484), Vector2(480, 484)],
 		"ventana": [Vector2(592, 305), Vector2(780, 305), Vector2(780, 398), Vector2(592, 398)],
-		"placa": [Vector2(479, 267), Vector2(563, 267), Vector2(563, 292), Vector2(479, 292)],
 		"huellas": [Vector2(500, 500), Vector2(575, 500), Vector2(790, 636), Vector2(620, 636)],
-		"puerta_morada": [Vector2(472, 560), Vector2(808, 560), Vector2(808, 634), Vector2(472, 634)],
 	},
 	# Ventana de la Oficina: coordenadas dentro del cristal de 924x520 (no del lienzo de 1280x720).
 	"pasillo_secreto": {
 		"puerta_morada": [Vector2(420, 217), Vector2(502, 217), Vector2(502, 345), Vector2(420, 345)],
-		"placa": [Vector2(406, 168), Vector2(516, 168), Vector2(516, 208), Vector2(406, 208)],
 	},
 }
 

@@ -670,7 +670,7 @@ func set_panel_abierto(valor: bool) -> void:
 func _actualizar_botones() -> void:
 	if _boton_volver == null:
 		return
-	_boton_volver.disabled = _hay_panel or DatosSalas.volver_a(EstadoJuego.sala_actual) == ""
+	_boton_volver.disabled = _hay_panel or (DatosSalas.volver_a(EstadoJuego.sala_actual) == "" and not DatosSalas.volver_bloqueado(EstadoJuego.sala_actual))
 	_boton_cerrar.disabled = not _hay_panel
 
 
