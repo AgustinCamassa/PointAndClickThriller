@@ -14,6 +14,20 @@ FONDOS FOTORREALISTAS (actuales)
   python3 importar_fondos.py CARPETA_ORIGINALES  -> fondos, cam_1/cam_2 (filtro verde), monitores de Vigilancia, ventana_recepcion (sin plantas) y habitacion_secreta(_sentada)
                                                     Carpeta de originales: los 9 fondos + hab_tumbada, hab_sentada, ventana_recepcion (las puertas NO se tiñen)
   python3 importar_personaje.py espaldas.png silla.png -> assets/sprites/alicia_de_espaldas.png y alicia_sentada.png
-  python3 importar_detector.py detector.png       -> assets/sprites/detector.png (LCD en blanco)
+  python3 importar_detector.py <imagen> ../../assets/sprites/detector.png  -> detector 360x800 (voltea para antena a la derecha, LEDs apagados, LCD ampliado)
+  python3 sprites_entidad.py                      -> assets/sprites/entidad_a.png (modos 1-2) y entidad_b.png (modo 3) desde fuentes/entidad_*_fuente.png (blanco->transparente, ojos conservados)
+  python3 audio.py musica_modo3 entidad_acecho    -> musica_modo3.ogg (banda sonora del modo 3) y entidad_acecho.ogg (tensión de la entidad)
   Las zonas clicables de estos fondos se escriben a mano en scripts/nucleo/zonas_fondos.gd (exportar3d.py ya no se usa para ellas).
+  python3 digitos.py                              -> assets/sprites/digitos.png (tira con los dígitos 0-9 para el PIN)
+  (Los glifos del puzzle del laboratorio no usan imágenes: son constelaciones dibujadas por código en scripts/nucleo/glifos.gd.)
+  python3 audio.py pitidos_4 ... pitidos_9        -> assets/audio/pitidos_N.ogg (CAM 3: N pitidos = N estrellas de la constelación)
+  python3 constelaciones.py --escribir            -> regenera PUNTOS/LINEAS de las 6 constelaciones reales (4-9 estrellas) en glifos.gd
+  python3 importar_macabros.py CARPETA_ORIGINALES  -> fondos <sala>_macabro, cam_1_macabro y los cuadros (alinea, gradúa el color y repinta monitores)
+  python3 fondos_apagon.py                        -> assets/fondos/*_apagon.png (fondos oscurecidos del apagón; no toca los originales)
+  python3 audio.py apagon_inicio apagon_fin       -> assets/audio/apagon_inicio.ogg y apagon_fin.ogg (apagón)
+  python3 audio.py tecla                          -> assets/audio/tecla.ogg (teclado del PIN)
+  python3 audio.py detector_alarma                -> assets/audio/detector_alarma.ogg (pitido continuo con >= 90 %)
   python3 audio.py detector_bip                    -> assets/audio/detector_bip.ogg (pitido del detector)
+
+fondo_titulo.py : genera el fondo del título (assets/fondos/titulo.png) con el cartel del edificio muy borroso y los tres
+  recortes más nítidos (titulo_cartel_1/2/3.png) que el título superpone según los modos superados. Fuente nítida: fuentes/titulo_nitido.png.

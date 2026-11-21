@@ -2,6 +2,7 @@ extends CanvasLayer
 ## Fundidos a negro para cambiar de sala o de escena.
 
 var ocupada := false
+var suprimir_cambios_escena := false   # solo para pruebas automáticas: las muertes simuladas no cargan escenas
 var _negro: ColorRect
 
 
@@ -42,6 +43,12 @@ func cambiar(accion: Callable, duracion := 0.4) -> void:
 
 
 func ir_a_escena(ruta: String, duracion := 0.4) -> void:
+	if suprimir_cambios_escena:
+		return
+	# Si ya hay un fundido en curso (p. ej. una muerte al entrar en una sala marcada ocurre dentro del viaje), esperamos a que
+	# termine; si no, el cambio de escena se perdía y el juego quedaba parado.
+	while ocupada:
+		await get_tree().process_frame
 	var accion := func() -> void:
 		get_tree().change_scene_to_file(ruta)
 		await get_tree().process_frame

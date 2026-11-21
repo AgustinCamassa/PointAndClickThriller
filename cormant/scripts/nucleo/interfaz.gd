@@ -5,18 +5,21 @@ extends CanvasLayer
 
 signal volver_pedido
 signal cerrar_pedido
+signal dev_fin_pedido   # DEV (K): se resolvió el 5.º glifo; la escena lanza el documento final
 
 var activa := false
 
 var _raiz: Control
 var _tinte_compat: ColorRect
-var _tinte_rojo: ColorRect
+var _tinte_rojo: Control   # filtro rojo (FiltroRojo) en una capa por encima de toda la interfaz
+var _capa_filtro: CanvasLayer
+var _atenuacion := 1.0
 var _parpadeo: ColorRect
 var _oculto: ColorRect
-var _etiqueta_compat: Label
 var _boton_notas: Button
 var _mensaje: Label
 var _texto_evento: Label
+var _lcd_rect := Rect2()
 var _boton_reportar: Button
 var _boton_descartar: Button
 var _boton_siguiente: Button
@@ -40,6 +43,13 @@ var _hay_panel := false
 var _etiqueta_dev: Label
 var _tween_mensaje: Tween
 var _tiempo_parpadeo := 0.0
+var _apagon: ColorRect
+var _tween_apagon: Tween
+var _tiempo_alarma := 0.0
+var _tween_alarma: Tween
+const FiltroRojo := preload("res://scripts/nucleo/filtro_rojo.gd")
+const ALARMA_PERIODO := 1.5
+const ALARMA_APAGADO := 0.45   # parte del periodo en que los LEDs se apagan al destellar
 var _mensaje_oculto_en := 0.0
 
 
@@ -49,9 +59,10 @@ func _ready() -> void:
 	_construir()
 	EstadoJuego.compatibilidad_cambiada.connect(_al_cambiar_compatibilidad)
 	EstadoJuego.fragmento_obtenido.connect(func(_id): _refrescar_notas())
-	EstadoJuego.codigo_cambiado.connect(_refrescar_notas)
+	EstadoJuego.glifos_cambiado.connect(_refrescar_notas)
 	EstadoJuego.partida_nueva.connect(_al_nueva_partida)
 	Director.mensaje.connect(mensaje)
+	Director.apagon_cambiado.connect(_al_cambiar_apagon)
 	Director.advertencia_iniciada.connect(_al_iniciar_advertencia)
 	Director.advertencia_terminada.connect(func(_s): _al_terminar_advertencia())
 	Director.terminal_bloqueado.connect(func(_s): _refrescar_menu())
@@ -68,16 +79,15 @@ func _construir() -> void:
 	add_child(_raiz)
 
 	_tinte_compat = _rect_filtro(Color(0.02, 0.0, 0.05, 0.0))
-	_tinte_rojo = _rect_filtro(Color(0.7, 0.0, 0.0, 0.0))
+	# La luz roja tiñe también el detector, la libreta y los botones: va en una capa por encima de la interfaz.
+	_capa_filtro = CanvasLayer.new()
+	_capa_filtro.layer = layer + 1
+	add_child(_capa_filtro)
+	_tinte_rojo = FiltroRojo.new()
+	_capa_filtro.add_child(_tinte_rojo)
 	_parpadeo = _rect_filtro(Color(0, 0, 0, 0))
 	_oculto = _rect_filtro(Color(0, 0, 0, 0))
-
-	_etiqueta_compat = Label.new()
-	_etiqueta_compat.position = Vector2(1000, 14)
-	_etiqueta_compat.size = Vector2(266, 30)
-	_etiqueta_compat.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_etiqueta_compat.add_theme_font_size_override("font_size", 20)
-	_raiz.add_child(_etiqueta_compat)
+	_apagon = _rect_filtro(Color(0, 0, 0, 0))   # luces apagadas: por debajo del detector, que sigue encendido
 
 	_construir_detector()
 	EstadoJuego.detector_obtenido.connect(func():
@@ -144,7 +154,7 @@ func _construir() -> void:
 
 	# Caja de texto: justo encima de los botones inferiores.
 	_mensaje = Label.new()
-	_mensaje.position = Vector2(430, 446)
+	_mensaje.position = Vector2(360, 446)   # centrado en la pantalla (1280 px): 640 - 560 / 2
 	_mensaje.size = Vector2(560, 100)
 	_mensaje.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_mensaje.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
@@ -227,19 +237,20 @@ func _construir_notas() -> void:
 	_raiz.add_child(_notas)
 
 
-## Detector de señales en la esquina inferior derecha. El sprite lleva LCD, LEDs y botones sin contenido:
-##  - LCD: lista de señales activas y, debajo, el texto de la señal seleccionada.
-##  - LEDs: apagados sin anomalías; encendidos con alguna; con cada señal nueva parpadean 2 veces y pita.
-##  - Los botones del dibujo son solo decorativos; descartar / reportar / otra señal son tres botones en la
-##    franja inferior de la pantalla (sobre Volver y Cerrar) que solo aparecen en Vigilancia.
-## Las constantes salen de importar_detector.py (coordenadas del PNG original de 475x1349).
-const DETECTOR_TAM := Vector2(211, 600)
-const LCD_REL := Rect2(0.2021, 0.4529, 0.6021, 0.1972)
-const DET_ORIGINAL := Vector2(475, 1349)
-const LEDS_X := [110, 141, 172, 203, 235, 266, 297, 329, 360]
-const LEDS_Y := 537
-const LEDS_COLOR := [Color(0.4, 0.82, 0.2), Color(0.43, 0.84, 0.2), Color(0.45, 0.85, 0.19), Color(0.48, 0.86, 0.2),
-	Color(0.59, 0.85, 0.19), Color(0.89, 0.83, 0.15), Color(0.9, 0.79, 0.15), Color(0.9, 0.71, 0.13), Color(0.89, 0.2, 0.27)]
+## Detector de señales, pegado al borde inferior derecho (el sprite está recortado: se ve de la antena a los botones).
+##  - LCD (grande, marcos laterales reducidos): lista de señales activas y, debajo, el texto de la señal seleccionada.
+##  - LEDs = compatibilidad: 9 luces de 10 % cada una (verdes 1-5, amarillas 6-8, roja 9). Con cada señal nueva las luces
+##    encendidas parpadean 2 veces y el detector pita; con 0 % parpadea solo la primera luz y queda apagada.
+##  - Los botones del dibujo (◀ ■ ▶) son decorativos; descartar / reportar / otra señal son tres botones en la franja
+##    inferior de la pantalla (sobre Volver y Cerrar) que solo aparecen en Vigilancia.
+## Las constantes salen de importar_detector.py (coordenadas del PNG original de 468x1040). Antena a la derecha, ruleta a la izquierda.
+const DETECTOR_TAM := Vector2(190, 422)
+const LCD_REL := Rect2(0.1175, 0.5635, 0.7991, 0.2923)
+const DET_ORIGINAL := Vector2(468, 1040)
+const LEDS_X := [107, 138, 169, 200, 231, 262, 293, 325, 356]
+const LEDS_Y := 528
+const LEDS_COLOR := [Color(0.4, 0.82, 0.2), Color(0.4, 0.82, 0.2), Color(0.43, 0.84, 0.2), Color(0.45, 0.85, 0.19), Color(0.48, 0.86, 0.2),
+	Color(0.9, 0.83, 0.15), Color(0.9, 0.79, 0.15), Color(0.9, 0.72, 0.13), Color(0.89, 0.2, 0.27)]
 
 
 func _escala_det() -> Vector2:
@@ -248,7 +259,7 @@ func _escala_det() -> Vector2:
 
 func _construir_detector() -> void:
 	_detector = Control.new()
-	_detector.position = Vector2(1280, 720) - DETECTOR_TAM - Vector2(6, 6)
+	_detector.position = Vector2(1280.0 - DETECTOR_TAM.x - 8.0, 720.0 - DETECTOR_TAM.y)
 	_detector.size = DETECTOR_TAM
 	_detector.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_detector.visible = EstadoJuego.tiene_detector
@@ -273,13 +284,14 @@ func _construir_detector() -> void:
 	var lcd := Rect2(DETECTOR_TAM * LCD_REL.position, DETECTOR_TAM * LCD_REL.size)
 	_senales = Label.new()
 	_senales.position = lcd.position + Vector2(5, 3)
-	_senales.size = Vector2(lcd.size.x - 8, 50)
+	_lcd_rect = lcd
+	_senales.size = Vector2(lcd.size.x - 8, 54)
 	_senales.clip_text = true
 	_estilo_lcd(_senales, Color(0.4, 1.0, 0.55))
 	_detector.add_child(_senales)
 	_texto_evento = Label.new()
-	_texto_evento.position = lcd.position + Vector2(5, 57)
-	_texto_evento.size = Vector2(lcd.size.x - 8, lcd.size.y - 60)
+	_texto_evento.position = lcd.position + Vector2(5, 60)
+	_texto_evento.size = Vector2(lcd.size.x - 8, lcd.size.y - 64)
 	_texto_evento.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_texto_evento.clip_text = true
 	_estilo_lcd(_texto_evento, Color(0.3, 0.78, 0.42))
@@ -293,14 +305,14 @@ func _construir_detector() -> void:
 		led.position = centro
 		var halo := ColorRect.new()
 		halo.color = Color(c, 0.28)
-		halo.position = Vector2(-8, -9)
-		halo.size = Vector2(16, 18)
+		halo.position = Vector2(-6.5, -7)
+		halo.size = Vector2(13, 14)
 		halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		led.add_child(halo)
 		var luz := ColorRect.new()
 		luz.color = c
-		luz.position = Vector2(-4, -4.5)
-		luz.size = Vector2(8, 9)
+		luz.position = Vector2(-3.2, -3.5)
+		luz.size = Vector2(6.4, 7)
 		luz.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		led.add_child(luz)
 		led.visible = false
@@ -309,8 +321,16 @@ func _construir_detector() -> void:
 	_refrescar_menu()
 
 
+## El texto de la señal elegida va justo debajo de la lista (que crece con cada señal), sin pisarla.
+func _acomodar_lcd() -> void:
+	var alto := float(_senales.get_line_count()) * float(_senales.get_line_height())
+	_senales.size.y = alto
+	_texto_evento.position.y = _senales.position.y + alto + 3.0
+	_texto_evento.size.y = maxf(_lcd_rect.end.y - _texto_evento.position.y - 4.0, 0.0)
+
+
 func _estilo_lcd(l: Label, color: Color) -> void:
-	l.add_theme_font_size_override("font_size", 10)
+	l.add_theme_font_size_override("font_size", 11)
 	l.add_theme_constant_override("line_spacing", 0)
 	l.add_theme_color_override("font_color", color)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -382,6 +402,7 @@ func activar(valor: bool) -> void:
 	activa = valor
 	_raiz.visible = valor
 	if not valor:
+		_al_terminar_advertencia()   # nada de ocultarse (barra, botón, oscurecimiento) pillado al cambiar de escena
 		_pausa.visible = false
 		get_tree().paused = false
 
@@ -389,11 +410,46 @@ func activar(valor: bool) -> void:
 ## Al volver al título se apagan todos los trucos: invulnerabilidad y panel de depuración.
 func desactivar_trucos() -> void:
 	EstadoJuego.desactivar_trucos()
+	Director.entidades_pausadas = false
 	_etiqueta_dev.visible = false
 	_depuracion.visible = false
 
 
+func _al_cambiar_apagon(activo: bool) -> void:
+	## Se van las luces (oscuridad casi total salvo el detector) y se bloquea todo salvo OCULTARSE; al volver, un chasquido de luz.
+	if _tween_apagon != null:
+		_tween_apagon.kill()
+	_tween_apagon = create_tween()
+	_apagon.color = Color(0, 0, 0, 0)
+	if activo:
+		_claves_previas = {}
+		if _leds_tween != null:
+			_leds_tween.kill()
+		_animando_leds = false
+		# Destello de caída de tensión (el fondo ya cambia a su versión oscura): nada de pantallazo negro.
+		_tween_apagon.tween_property(_apagon, "color:a", 0.45, 0.05)
+		_tween_apagon.tween_property(_apagon, "color:a", 0.0, 0.2)
+	else:
+		_tween_apagon.tween_property(_apagon, "color:a", 0.3, 0.05)
+		_tween_apagon.tween_property(_apagon, "color:a", 0.0, 0.2)
+		_claves_previas = {}   # al volver la luz no se considera «señal nueva» lo que ya estaba
+	_poner_leds(nivel_leds())
+	_refrescar_menu()
+	_actualizar_botones()
+
+
+## En el apagón el detector y la libreta se oscurecen con el resto de la imagen (siguen legibles, pero ya no «pegados» encima).
+func _atenuar_ui_apagon(delta: float) -> void:
+	var objetivo := 0.45 if Director.apagon_activo() else 1.0
+	_atenuacion = move_toward(_atenuacion, objetivo, delta * 6.0)
+	var c := Color(_atenuacion, _atenuacion, _atenuacion, 1.0)
+	for n in [_detector, _boton_notas, _notas, _boton_volver, _boton_cerrar]:
+		if n != null:
+			n.modulate = c
+
+
 func _al_nueva_partida() -> void:
+	_apagon.color.a = 0.0
 	_claves_previas = {}
 	_animando_leds = false
 	if _leds_tween != null:
@@ -426,6 +482,13 @@ func alternar_pausa() -> void:
 	_pausa.visible = nuevo
 
 
+## DEV (K) va por _input para que ningún panel o botón con foco se trague la tecla.
+func _input(evento: InputEvent) -> void:
+	if activa and OS.is_debug_build() and evento is InputEventKey and evento.pressed and not evento.echo and evento.keycode == KEY_K:
+		_dev_paso_resolver()
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(evento: InputEvent) -> void:
 	if not activa:
 		return
@@ -451,6 +514,35 @@ func _unhandled_input(evento: InputEvent) -> void:
 			KEY_F:
 				EstadoJuego.sumar_compatibilidad(20.0, true)
 				mensaje("[DEV] +20 % de compatibilidad", 1.5)
+			KEY_H:
+				Director.entidades_pausadas = not Director.entidades_pausadas
+				mensaje("[DEV] Entidades %s" % ("PAUSADAS: sin sorteo ni anomalías (H para reanudar)" if Director.entidades_pausadas else "reanudadas"), 2.0)
+
+
+## DEV (tecla K): 1.ª pulsación mete el PIN de Vigilancia; las siguientes resuelven el glifo 1, 2, 3, 4 y 5 del puzzle
+## (solicitándolo antes si hace falta). Cada pulsación simula la partida real (solicita, resuelve la anomalía, confirma y deja pedido el siguiente); tras el 5.º lanza el documento final.
+func _dev_paso_resolver() -> void:
+	if not EstadoJuego.vigilancia_abierta:
+		EstadoJuego.abrir_vigilancia()
+		mensaje("[DEV] PIN de Vigilancia resuelto", 2.0)
+		return
+	if EstadoJuego.glifos_completos():
+		dev_fin_pedido.emit()
+		return
+	# Simula la partida real: se solicita el glifo, su anomalía se resuelve (el glifo se ve), se confirma en el terminal
+	# y se solicita el siguiente, para que las anomalías que dependen del glifo pedido/resuelto se comporten como al jugar.
+	var i := EstadoJuego.confirmados
+	if EstadoJuego.solicitados == i:
+		EstadoJuego.solicitar()
+	var id: String = EstadoJuego.ORDEN_FRAGMENTOS[i]
+	EstadoJuego.revelar(id)
+	if not EstadoJuego.confirmar(i, EstadoJuego.glifos[i]):
+		return
+	mensaje("[DEV] Glifo %d de 5 resuelto" % (i + 1), 2.0)
+	if EstadoJuego.glifos_completos():
+		dev_fin_pedido.emit()
+	else:
+		EstadoJuego.solicitar()
 
 
 # --- Mensajes y etiquetas ----------------------------------------------------------------------
@@ -466,14 +558,10 @@ func mensaje(texto: String, duracion := 3.5) -> void:
 
 
 func _al_cambiar_compatibilidad(valor: float) -> void:
-	_etiqueta_compat.text = "COMPATIBILIDAD  %d%%" % int(round(valor))
-	var color := Color(0.85, 0.85, 0.85)
-	if valor >= Director.UMBRAL_ADVERTENCIA:
-		color = Color(0.95, 0.35, 0.25)
-	elif valor >= Director.UMBRAL_TONO:
-		color = Color(0.95, 0.8, 0.3)
-	_etiqueta_compat.add_theme_color_override("font_color", color)
+	## Ya no hay medidor numérico: la compatibilidad se lee en los LEDs del detector.
 	_tinte_compat.color.a = clampf(valor / 100.0 * 0.38, 0.0, 0.38)
+	if not _animando_leds:
+		_poner_leds(nivel_leds())
 
 
 func _al_pedir_sonido(nombre: String) -> void:
@@ -489,11 +577,11 @@ func _alternar_notas() -> void:
 
 
 func _refrescar_notas() -> void:
-	## La libreta guarda los objetivos y el avance, no los números: hay que recordarlos.
+	## La libreta guarda los objetivos y el avance, no los dibujos: hay que recordarlos.
 	if _texto_notas == null:
 		return
-	var lineas := ["OBJETIVOS", "Abrir el terminal del laboratorio con el código de 5 dígitos.", "Ahora: " + _objetivo_actual(), "", "CÓDIGO"]
-	for i in EstadoJuego.DIGITOS:
+	var lineas := ["OBJETIVOS", "Abrir el terminal del laboratorio con los 5 glifos.", "Ahora: " + _objetivo_actual(), "", "GLIFOS"]
+	for i in EstadoJuego.NUM_GLIFOS:
 		var nombre: String = Textos.NOMBRE_FRAGMENTO[EstadoJuego.ORDEN_FRAGMENTOS[i]]
 		var estado := "bloqueado"
 		if i < EstadoJuego.confirmados:
@@ -502,7 +590,7 @@ func _refrescar_notas() -> void:
 			estado = "por introducir en el terminal"
 		lineas.append("%d. %s: %s" % [i + 1, nombre, estado])
 	lineas.append("")
-	lineas.append("Los números no se anotan solos.")
+	lineas.append("Los dibujos no se anotan solos.")
 	_texto_notas.text = "\n".join(lineas)
 	call_deferred("_ajustar_libreta")
 
@@ -515,17 +603,21 @@ func _ajustar_libreta() -> void:
 	_notas.position = Vector2(14, 654.0 - _notas.size.y)
 
 
-## Siguiente paso del código según lo que lleva el jugador (sin revelar ningún número).
+## Siguiente paso del puzzle según lo que lleva el jugador (sin revelar ningún glifo).
 func _objetivo_actual() -> String:
 	var e := EstadoJuego
-	if e.codigo_completo():
+	if not e.vigilancia_abierta:
+		return "encontrar el PIN de la puerta de Vigilancia (el ordenador de la recepción)."
+	if not e.tiene_tarjeta:
+		return "encontrar una tarjeta de seguridad para abrir el laboratorio."
+	if e.glifos_completos():
 		return "El terminal está abierto."
 	if e.solicitados > e.confirmados:
 		var id: String = e.ORDEN_FRAGMENTOS[e.confirmados]
 		if e.visibles.has(id):
-			return "introducir en el terminal el dígito que has visto."
-		return "buscar el dígito %d. %s" % [e.confirmados + 1, Textos.PISTA_SOLICITUD[id]]
-	return "solicitar el dígito %d en el terminal del laboratorio." % (e.confirmados + 1)
+			return "introducir en el terminal el glifo que has visto."
+		return "buscar el glifo %d. %s" % [e.confirmados + 1, Textos.PISTA_SOLICITUD[id]]
+	return "solicitar el glifo %d en el terminal del laboratorio." % (e.confirmados + 1)
 
 
 # --- Menú de eventos -----------------------------------------------------------------------------------
@@ -542,16 +634,19 @@ func _refrescar_menu() -> void:
 		return
 	var e = _evento_visible()
 	var en_vigilancia := EstadoJuego.sala_actual == "vigilancia"
-	var libre := activa and en_vigilancia and e != null and not Director.terminal_ocupado()
+	var libre := activa and en_vigilancia and e != null and not Director.terminal_ocupado() and not Director.apagon_activo()
 	# Los tres botones solo existen en Vigilancia, con el detector y alguna señal activa.
 	var mostrar := activa and en_vigilancia and EstadoJuego.tiene_detector and e != null
 	for b in [_boton_reportar, _boton_descartar, _boton_siguiente]:
 		b.visible = mostrar
 	_boton_reportar.disabled = not libre
 	_boton_descartar.disabled = not libre
-	_boton_siguiente.disabled = not (mostrar and Director.eventos.size() > 1)
+	_boton_siguiente.disabled = not (mostrar and Director.eventos.size() > 1) or Director.apagon_activo()
+	if Director.apagon_activo():
+		_texto_evento.text = "SIN ENERGÍA"
+		return
 	if e == null or not en_vigilancia:
-		_texto_evento.text = "" if e == null else "Ve a Vigilancia para decidir."
+		_texto_evento.text = "" if e == null else "Esto se decide desde Vigilancia."
 		return
 	var texto: String = Director.DESCRIPCION.get(e.tipo, e.tipo)
 	if e.pista != "":
@@ -617,10 +712,13 @@ func _al_terminar_advertencia() -> void:
 func _process(delta: float) -> void:
 	if not activa or get_tree().paused:
 		return
-	_tinte_rojo.color.a = 0.26 if EstadoJuego.filtro_rojo() else 0.0
+	_tinte_rojo.intensidad = move_toward(_tinte_rojo.intensidad, 1.0 if EstadoJuego.filtro_rojo() else 0.0, delta * 4.0)
+	_atenuar_ui_apagon(delta)
 	_etiqueta_dev.visible = EstadoJuego.invulnerable
 	_actualizar_parpadeo(delta)
+	_actualizar_alarma_detector(delta)
 	_refrescar_senales()
+	_acomodar_lcd()
 	if Director.advertencia_activa and Director.manteniendo:
 		Sonido.bucle("latido", -4.0)
 	else:
@@ -633,6 +731,30 @@ func _process(delta: float) -> void:
 		_actualizar_depuracion()
 
 
+func _actualizar_alarma_detector(delta: float) -> void:
+	## Con 90 % o más el detector pita sin parar (pitido grave y suave; los pitidos de la CAM 3 lo silencian mientras suenan para no
+	## mezclarse con la estática) y los LEDs destellan al ritmo de cada pitido. En el modo 3 (99 %) es toda la partida.
+	if not EstadoJuego.tiene_detector or not EstadoJuego.jugando or EstadoJuego.compatibilidad < 90.0 or Director.apagon_activo():
+		_tiempo_alarma = 0.0
+		return
+	_tiempo_alarma -= delta
+	if _tiempo_alarma > 0.0:
+		return
+	_tiempo_alarma = ALARMA_PERIODO
+	if _animando_leds:
+		return   # el aviso de una señal nueva ya los está haciendo parpadear
+	if not Director.pitidos_activos():
+		Sonido.reproducir("detector_alarma", -6.0)
+	if _tween_alarma != null:
+		_tween_alarma.kill()
+	_poner_leds(0)
+	_tween_alarma = create_tween()
+	_tween_alarma.tween_interval(ALARMA_APAGADO)
+	_tween_alarma.tween_callback(func():
+		if not _animando_leds:
+			_poner_leds(nivel_leds()))
+
+
 func _actualizar_parpadeo(delta: float) -> void:
 	# Intensidad según tramo y advertencia: luces que parpadean (rectángulo negro, sin shaders).
 	var intensidad := 0.0
@@ -642,7 +764,9 @@ func _actualizar_parpadeo(delta: float) -> void:
 	if Director.advertencia_activa:
 		intensidad = 1.0
 	var factor := 1.0
-	if Director.parpadeo_restante > 0.0 and EstadoJuego.sala_actual == "vigilancia":
+	if Director.entidad_parpadeo > 0.0 or Director.parpadeo_ambiente > 0.0 or Director.apagon_aviso > 0.0:
+		intensidad = 1.0   # la entidad se detiene tras el clic: parpadeos hasta desaparecer
+	elif Director.parpadeo_restante > 0.0 and EstadoJuego.sala_actual == "vigilancia":
 		intensidad = 1.0
 		factor = EstadoJuego.cfg("parpadeo_factor")   # modo 3: doble de intensidad (más oscuro y más seguido)
 	_tiempo_parpadeo -= delta
@@ -655,12 +779,18 @@ func _actualizar_parpadeo(delta: float) -> void:
 			_tiempo_parpadeo = (randf_range(0.15, 0.6) if intensidad > 0.0 else 0.3) / factor
 
 
+## Dónde se ve el dato resuelto (el LCD lo dice para que el jugador sepa dónde mirar).
+const DONDE_DATO := {"mancha": "CAM 2", "retrato": "CAM 1", "sombra": "PC2", "viento": "oficina"}
 const NOMBRE_SENAL := {"cuadro": "CAM1 cuadro", "mancha": "CAM2 mancha", "voz": "CAM3 susurro"}
-const ABREVIATURA_SALA := {"recepcion": "RECEP."}
 
 
 func _refrescar_senales() -> void:
 	## Todo lo activo en un solo sitio (LCD del detector), sin decir si las señales son reales.
+	if Director.apagon_activo():
+		# Apagón: el detector sigue encendido pero muestra un error y enciende todas las luces.
+		_senales.text = "ERROR 0xE5\nSISTEMA CAÍDO\n▒▒▒▒▒▒▒▒"
+		_poner_leds(_leds.size())
+		return
 	var lineas: Array[String] = []
 	var claves := {}   # solo anomalías (no los «datos visibles»): sirven para los LEDs y el aviso de señal nueva
 	var elegido = _evento_visible()
@@ -674,10 +804,6 @@ func _refrescar_senales() -> void:
 	if Director.pitidos_activos():
 		lineas.append("CAM3 pitidos %ds" % int(ceil(Director.pitidos_restante)))
 		claves["pitidos"] = true
-	if Director.marca_restante > 0.0 and Director.sala_marcada != "":
-		var sala: String = ABREVIATURA_SALA.get(Director.sala_marcada, DatosSalas.nombre(Director.sala_marcada).left(6).to_upper())
-		lineas.append("MARCA %s %ds" % [sala, int(ceil(Director.marca_restante))])
-		claves["marca"] = true
 	if Director.parpadeo_pendiente:
 		lineas.append("Parpadeo pend.")
 		claves["parpadeo"] = true
@@ -685,11 +811,11 @@ func _refrescar_senales() -> void:
 		lineas.append("Oficina viento")
 		claves["viento"] = true
 	for id in EstadoJuego.visibles:
-		lineas.append("Dato visible %ds" % int(ceil(EstadoJuego.visibles[id])))
-	if Director.numero_recepcion_visible():
-		lineas.append("Dato visible %ds" % int(ceil(Director.numero_restante)))
+		lineas.append("Dato visible %s %ds" % [DONDE_DATO.get(id, ""), int(ceil(EstadoJuego.visibles[id]))])
+	if Director.glifo_recepcion_visible():
+		lineas.append("Dato visible %s %ds" % [DONDE_DATO.get("sombra", ""), int(ceil(Director.glifo_restante))])
 	if Director.manchas_viento_visibles():
-		lineas.append("Dato visible %ds" % int(ceil(Director.viento_manchas_restante)))
+		lineas.append("Dato visible %s %ds" % [DONDE_DATO.get("viento", ""), int(ceil(Director.viento_manchas_restante))])
 	if lineas.is_empty():
 		lineas.append("Sin actividad")
 	_senales.text = "\n".join(lineas)
@@ -702,15 +828,32 @@ func _refrescar_senales() -> void:
 	if nueva:
 		_alerta_detector()
 	if not _animando_leds:
-		_poner_leds(not claves.is_empty())
+		_poner_leds(nivel_leds())
 
 
-func _poner_leds(encendidos: bool) -> void:
-	for led in _leds:
-		led.visible = encendidos
+## Luces que corresponden a la compatibilidad: una por cada 10 % (60 % = 6 luces; 90 % o más = las 9, con la roja).
+func nivel_leds() -> int:
+	## LEDs encendidos según la compatibilidad: 1–15 % → 1; 16–29 → 2; 30–39 → 3; 40–49 → 4; 50–59 → 5;
+	## 60–69 → 6 (5 verdes + 1 amarillo); 70–79 → 7; 80–89 → 8; 90–100 → 9 (el rojo).
+	if Director.apagon_activo():
+		return _leds.size()   # durante el apagón el detector enciende todas las luces
+	var c := EstadoJuego.compatibilidad
+	if c < 1.0:
+		return 0
+	if c < 16.0:
+		return 1
+	if c < 30.0:
+		return 2
+	return clampi(int(floor(c / 10.0 + 0.0001)), 3, _leds.size())
 
 
-## Señal nueva: los LEDs parpadean 2 veces y el detector pita en cada destello (solo si se tiene el detector).
+func _poner_leds(nivel: int) -> void:
+	for i in _leds.size():
+		_leds[i].visible = i < nivel
+
+
+## Señal nueva: parpadean 2 veces las luces del nivel de compatibilidad actual (solo la primera si es 0 %, que luego queda
+## apagada) y el detector pita en cada destello (solo si se tiene el detector).
 func _alerta_detector() -> void:
 	if not EstadoJuego.tiene_detector:
 		return
@@ -718,21 +861,28 @@ func _alerta_detector() -> void:
 		_leds_tween.kill()
 	_animando_leds = true
 	_leds_tween = create_tween()
+	var nivel := nivel_leds()
+	var destello := maxi(nivel, 1)
+	if nivel > 0:
+		_leds_tween.tween_callback(func(): _poner_leds(0))
+		_leds_tween.tween_interval(0.1)
 	for i in 2:
 		_leds_tween.tween_callback(func():
-			_poner_leds(true)
+			_poner_leds(destello)
 			Sonido.reproducir("detector_bip"))
 		_leds_tween.tween_interval(0.14)
-		_leds_tween.tween_callback(func(): _poner_leds(false))
+		_leds_tween.tween_callback(func(): _poner_leds(0))
 		_leds_tween.tween_interval(0.12)
-	_leds_tween.tween_callback(func(): _animando_leds = false)
+	_leds_tween.tween_callback(func():
+		_animando_leds = false
+		_poner_leds(nivel_leds()))
 
 
 func _actualizar_depuracion() -> void:
 	var activos := []
 	for e in Director.eventos:
 		activos.append("%s(%s,%ds)" % [e.tipo, "real" if e.real else "falso", int(e.restante)])
-	_depuracion.text = "t=%s tramo=%d comp=%.0f%% muertes=%d\nproximo=%.0f gracia=%.0f bloqueo=%.0f\nactivos=%s marca=%s\nfijas=%s bolsa=%s\ncodigo=%s" % [
+	_depuracion.text = "t=%s tramo=%d comp=%.0f%% muertes=%d\nproximo=%.0f gracia=%.0f bloqueo=%.0f\nactivos=%s silueta_en_rodaje=%s\nfijas=%s bolsa=%s\nglifos=%s" % [
 		EstadoJuego.tiempo_formateado(), EstadoJuego.tramo, EstadoJuego.compatibilidad, EstadoJuego.muertes,
-		Director.proximo, Director.gracia, Director.bloqueo, str(activos), Director.sala_marcada,
-		str(Director.fijas.keys()), str(Director.bolsa), str(EstadoJuego.codigo)]
+		Director.proximo, Director.gracia, Director.bloqueo, str(activos), EstadoJuego.silueta_en_rodaje(),
+		str(Director.fijas.keys()), str(Director.bolsa), str(EstadoJuego.glifos)]

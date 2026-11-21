@@ -5,7 +5,7 @@ DEST = "../../assets"
 os.makedirs(DEST+"/sprites", exist_ok=True)
 def guardar(img, ruta):
     img.save(os.path.join(DEST, ruta), optimize=True)
-spr = {"mancha_suelo": sp.mancha(), "cuadro_recto": sp.cuadro(False)}
+spr = {"mancha_suelo": sp.mancha()}
 for n, im in spr.items():
     guardar(im, f"sprites/{n}.png")
 print({n: im.size for n, im in spr.items()})

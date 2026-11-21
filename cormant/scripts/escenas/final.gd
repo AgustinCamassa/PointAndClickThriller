@@ -7,12 +7,15 @@ extends Control
 ##    «Sabes quién soy...». Después, el mismo cierre que el final malo.
 
 const TextoTachado := preload("res://scripts/escenas/texto_tachado.gd")
+const FiltroRojo := preload("res://scripts/nucleo/filtro_rojo.gd")
 const SANGRE := "res://assets/sprites/sangre_sabes_quien_soy.png"
 
 var _malo := false
 var _modo3 := false
 var _hoja: Control
-var _inferior: Label
+var _rojas: Array = []
+const MESA_LINEA_Y := 403.0   # borde superior de la mesa blanca (en el fondo de 1280x720): corte a ras, sin hueco
+var _rojo: Control   # filtro rojo del final malo (debe quedar por encima de los sprites)
 
 
 func _ready() -> void:
@@ -22,11 +25,9 @@ func _ready() -> void:
 	_modo3 = EstadoJuego.modo >= EstadoJuego.MODOS.size()
 	_fondo_laboratorio()
 	if _malo:
-		var rojo := ColorRect.new()
-		rojo.color = Color(0.7, 0.0, 0.0, 0.3)
-		rojo.set_anchors_preset(Control.PRESET_FULL_RECT)
-		rojo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(rojo)
+		_rojo = FiltroRojo.new()
+		_rojo.intensidad = 1.0
+		add_child(_rojo)
 	_mostrar_hoja()
 
 
@@ -70,21 +71,7 @@ func _mostrar_hoja() -> void:
 	if _modo3:
 		_hoja_sangre()
 	else:
-		_etiqueta(_hoja, Textos.DOCUMENTO_SUPERIOR, Vector2(350, 50), Vector2(580, 280))
-	if _modo3:
-		pass
-	elif _malo:
-		# La parte inferior está impresa con dos tintas; la luz roja revela la segunda.
-		_inferior = _etiqueta(_hoja, Textos.DOCUMENTO_INFERIOR_BUENO, Vector2(350, 350), Vector2(580, 160))
-		var roja := _etiqueta(_hoja, Textos.DOCUMENTO_ROJO, Vector2(350, 350), Vector2(580, 200), 20, Color(0.75, 0.05, 0.05))
-		roja.modulate.a = 0.0
-		var tween := create_tween()
-		tween.tween_interval(1.5)
-		tween.tween_property(roja, "modulate:a", 1.0, 2.5)
-		tween.parallel().tween_property(_inferior, "modulate:a", 0.0, 2.5)
-		Sonido.reproducir("tono_revelacion")
-	else:
-		_inferior = _etiqueta(_hoja, Textos.DOCUMENTO_INFERIOR_BUENO, Vector2(350, 350), Vector2(580, 200))
+		_hoja_documento()
 	var cerrar := Button.new()
 	cerrar.text = "Cerrar la hoja"
 	cerrar.position = Vector2(540, 620)
@@ -93,17 +80,51 @@ func _mostrar_hoja() -> void:
 	_hoja.add_child(cerrar)
 
 
+## Documento por bloques (Textos.documento): lo que se tapa o se revela depende del modo y del final.
+func _hoja_documento() -> void:
+	var modo2: bool = EstadoJuego.modo == 2
+	var tam := 14 if modo2 else 17
+	var caja := VBoxContainer.new()
+	caja.position = Vector2(350, 50)
+	caja.custom_minimum_size = Vector2(580, 0)
+	caja.add_theme_constant_override("separation", 12)
+	_hoja.add_child(caja)
+	for b in Textos.documento(EstadoJuego.modo, _malo):
+		var roja: bool = b["rojo"]
+		var l := _etiqueta(caja, b["texto"], Vector2.ZERO, Vector2(580, 0), tam, Color(0.75, 0.05, 0.05) if roja else Color(0.1, 0.08, 0.06))
+		l.custom_minimum_size = Vector2(580, 0)
+		l.add_theme_constant_override("line_spacing", -3 if modo2 else 0)
+		if roja:
+			l.modulate.a = 0.0
+			_rojas.append(l)
+		if b.has("nota") and _malo:
+			# Nota en tinta roja al lado de una línea del bloque (Modo 2 malo).
+			var n := _etiqueta(l, b["nota"], Vector2.ZERO, Vector2(260, 0), tam, Color(0.75, 0.05, 0.05))
+			var linea: String = String(b["texto"]).split("\n")[b["nota_linea"]]
+			n.position = Vector2(l.get_theme_default_font().get_string_size(linea, HORIZONTAL_ALIGNMENT_LEFT, -1, tam).x + 14.0, (l.get_line_height() + (-3 if modo2 else 0)) * b["nota_linea"])
+			n.autowrap_mode = TextServer.AUTOWRAP_OFF
+			n.modulate.a = 0.0
+			_rojas.append(n)
+	if not _rojas.is_empty():
+		# La luz roja revela la tinta roja.
+		var tween := create_tween()
+		tween.tween_interval(1.5)
+		for r in _rojas:
+			tween.parallel().tween_property(r, "modulate:a", 1.0, 2.5)
+		Sonido.reproducir("tono_revelacion")
+
+
 ## Modo 3: se ven los textos de los finales anteriores, se tachan uno a uno y la sombra escribe encima.
 func _hoja_sangre() -> void:
 	var superior = TextoTachado.new()
 	superior.position = Vector2(350, 50)
 	_hoja.add_child(superior)
-	superior.preparar(Textos.DOCUMENTO_SUPERIOR, 580.0)
+	superior.preparar(Textos.BLOQUE_A + "\n\n" + Textos.BLOQUE_D, 580.0, 13)
 	var anterior = TextoTachado.new()
-	anterior.position = Vector2(350, 350)
+	anterior.position = Vector2(350, 395)
 	anterior.color_texto = Color(0.55, 0.05, 0.05)
 	_hoja.add_child(anterior)
-	anterior.preparar(Textos.DOCUMENTO_ROJO, 580.0)
+	anterior.preparar(Textos.BLOQUE_B + "\n\n" + Textos.BLOQUE_E, 580.0, 13)
 	# Rótulo de la hoja de sangre: aparece recortado de izquierda a derecha, como si se escribiera.
 	var tex: Texture2D = load(SANGRE)
 	var marco := Control.new()
@@ -172,18 +193,28 @@ func _corte_a_negro() -> void:
 # --- Final malo -------------------------------------------------------------------------------------------
 
 func _cierre_malo() -> void:
+	# Recorte a la altura de los muslos: Alicia está detrás de la mesa blanca, frente al ordenador. Todo lo que queda por
+	# debajo de la línea de la mesa (y de la mesa misma) se corta: no se ven piernas ni pies.
+	var recorte := Control.new()
+	recorte.position = Vector2.ZERO
+	recorte.size = Vector2(1280, MESA_LINEA_Y)
+	recorte.clip_contents = true
+	recorte.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(recorte)
 	var alicia := Alicia.new()
-	alicia.configurar("de_espaldas", Vector2(640, 600), Vector2(97, 336))
-	add_child(alicia)
+	alicia.configurar("de_espaldas", Vector2(622, 511), Vector2(67, 231))
+	recorte.add_child(alicia)
+	move_child(_rojo, get_child_count() - 1)
 	alicia.aparecer(0.2)
 	await get_tree().create_timer(2.0).timeout
 	# La silueta aparece siempre detrás de Alicia.
 	var silueta := Alicia.new()
-	silueta.configurar("de_espaldas", Vector2(540, 590), Vector2(97, 336), true)
-	add_child(silueta)
-	move_child(silueta, alicia.get_index())
+	silueta.configurar("silueta", Vector2(570, 511), Vector2(92, 231), true)
+	recorte.add_child(silueta)
+	recorte.move_child(silueta, alicia.get_index())
 	silueta.aparecer(0.05)
 	Sonido.reproducir("golpe_grave")
+	move_child(_rojo, get_child_count() - 1)   # el filtro rojo tiñe también a Alicia y a la entidad, como al resto
 	# Parpadeo de la imagen y telón negro.
 	var negro := ColorRect.new()
 	negro.color = Color.BLACK

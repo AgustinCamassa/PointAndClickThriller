@@ -8,7 +8,7 @@ func _initialize() -> void:
 	await process_frame
 	var estado = root.get_node("EstadoJuego")
 	var director = root.get_node("Director")
-	estado.nueva_partida()
+	estado.nueva_partida(); estado.vigilancia_abierta = true; estado.tiene_tarjeta = true
 	var escena = load("res://escenas/escenario.tscn").instantiate()
 	root.add_child(escena)
 	await create_timer(0.6).timeout
@@ -16,6 +16,47 @@ func _initialize() -> void:
 		escena._mostrar_sala(sala)
 		await create_timer(0.5).timeout
 		root.get_viewport().get_texture().get_image().save_png("%s/sala_%s.png" % [salida, sala])
+	# Correo roto de la recepción y teclado del PIN
+	escena._mostrar_sala("recepcion")
+	await create_timer(0.3).timeout
+	escena._funcion("pc_correo")
+	await create_timer(0.4).timeout
+	root.get_viewport().get_texture().get_image().save_png("%s/panel_correo_pin.png" % salida)
+	print("PIN de la captura: ", estado.pin)
+	escena._panel_abierto.cerrar()
+	await create_timer(0.2).timeout
+	estado.vigilancia_abierta = false
+	escena._abrir_pin()
+	await create_timer(0.3).timeout
+	escena._panel_abierto._pulsar(estado.pin[0])
+	escena._panel_abierto._pulsar(estado.pin[1])
+	escena._panel_abierto._pulsar(estado.pin[2])
+	await create_timer(0.3).timeout
+	root.get_viewport().get_texture().get_image().save_png("%s/panel_teclado_pin.png" % salida)
+	escena._panel_abierto.cerrar()
+	estado.vigilancia_abierta = true
+	await create_timer(0.2).timeout
+	# Apagón: oscuridad, detector con error y todas las luces encendidas
+	estado.tiene_detector = true
+	root.get_node("Interfaz")._detector.visible = true
+	escena._mostrar_sala("vigilancia")
+	estado.fijar_compatibilidad(65.0)
+	await create_timer(0.3).timeout
+	director.iniciar_apagon()
+	await create_timer(0.6).timeout
+	root.get_viewport().get_texture().get_image().save_png("%s/apagon_vigilancia.png" % salida)
+	escena._mostrar_sala("laboratorio")
+	await create_timer(0.6).timeout
+	root.get_viewport().get_texture().get_image().save_png("%s/apagon_laboratorio.png" % salida)
+	escena._mostrar_sala("oficina")
+	await create_timer(0.6).timeout
+	root.get_viewport().get_texture().get_image().save_png("%s/apagon_oficina.png" % salida)
+	director.apagon_restante = 0.0
+	director.apagon_cambiado.emit(false)
+	estado.fijar_compatibilidad(0.0)
+	estado.tiene_detector = false
+	root.get_node("Interfaz")._detector.visible = false
+	await create_timer(0.5).timeout
 	# Tras morir: a los 3 s Alicia se incorpora (fondo "sentada")
 	estado.muertes = 1
 	escena._mostrar_sala("habitacion_secreta")
@@ -53,21 +94,40 @@ func _initialize() -> void:
 	root.get_node("Interfaz").alternar_pausa()
 	director.eventos.clear()
 	director.pitidos_restante = 0.0
-	estado.nueva_partida()
+	estado.nueva_partida(); estado.vigilancia_abierta = true; estado.tiene_tarjeta = true
 	# Anomalías nuevas en las salas
-	director.numero_recepcion = true
-	director.marca_restante = 0.0
+	for i in 2:
+		estado.solicitar()
+		estado.confirmar(i, estado.glifos[i])
+	estado.solicitar()
+	director.glifo_recepcion = true
+	director.glifo_restante = 30.0
 	escena._mostrar_sala("recepcion")
 	await create_timer(0.5).timeout
-	root.get_viewport().get_texture().get_image().save_png("%s/anom_recepcion_numero.png" % salida)
-	director.silueta_visible = true
-	director._silueta_restante = 60.0
+	root.get_viewport().get_texture().get_image().save_png("%s/anom_recepcion_glifo.png" % salida)
+	escena._funcion("pc_senal")
+	await create_timer(0.4).timeout
+	root.get_viewport().get_texture().get_image().save_png("%s/panel_glifo_mostrador.png" % salida)
+	escena._panel_abierto.cerrar()
+	await create_timer(0.2).timeout
+	estado.fijar_compatibilidad(35.0)
 	director.forzar("pitidos")
 	director.forzar("voz")
-	escena._mostrar_sala("vigilancia")
-	await create_timer(0.6).timeout
-	root.get_viewport().get_texture().get_image().save_png("%s/anom_vigilancia_silueta_hud.png" % salida)
+	for f in [1, 2, 3]:
+		director.silueta_visible = true
+		director.entidad_fase = f
+		director._silueta_restante = 60.0
+		escena._mostrar_sala("vigilancia")
+		await create_timer(0.7).timeout
+		root.get_viewport().get_texture().get_image().save_png("%s/anom_vigilancia_entidad_fase%d.png" % [salida, f])
 	director.silueta_visible = false
+	estado.tiene_detector = true
+	root.get_node("Interfaz")._detector.visible = true
+	for c in [35, 65, 95]:
+		estado.fijar_compatibilidad(float(c))
+		await create_timer(0.4).timeout
+		root.get_viewport().get_texture().get_image().save_png("%s/detector_leds_%d.png" % [salida, c])
+	estado.fijar_compatibilidad(0.0)
 	director.fijas["mancha"] = true
 	escena._mostrar_sala("pasillo")
 	await create_timer(0.5).timeout
@@ -100,26 +160,36 @@ func _initialize() -> void:
 	director.eventos.clear()
 	estado.visibles["mancha"] = 30.0
 	await create_timer(0.4).timeout
-	root.get_viewport().get_texture().get_image().save_png("%s/panel_camara_2_digito.png" % salida)
+	root.get_viewport().get_texture().get_image().save_png("%s/panel_camara_2_glifo.png" % salida)
 	escena._panel_abierto._elegir("1")
 	director.eventos.clear()
 	estado.visibles["retrato"] = 30.0
 	await create_timer(0.4).timeout
-	root.get_viewport().get_texture().get_image().save_png("%s/panel_camara_1_digito.png" % salida)
+	root.get_viewport().get_texture().get_image().save_png("%s/panel_camara_1_glifo.png" % salida)
 	director.forzar("voz")
 	escena._panel_abierto._elegir("3")
 	await create_timer(0.35).timeout
 	root.get_viewport().get_texture().get_image().save_png("%s/panel_camara_3_a.png" % salida)
 	await create_timer(0.23).timeout
 	root.get_viewport().get_texture().get_image().save_png("%s/panel_camara_3_b.png" % salida)
-	director.silueta_visible = true
-	director._silueta_restante = 30.0
+	# Cámara 3 con los pitidos: solo suenan, no se dibuja nada
+	director.eventos.clear()
+	director.forzar("pitidos")
+	for k in 5:
+		await create_timer(0.3).timeout
+		root.get_viewport().get_texture().get_image().save_png("%s/panel_camara_3_glifo_%d.png" % [salida, k])
 	escena._panel_abierto.cerrar()
 	await create_timer(0.2).timeout
-	escena._abrir_panel("ventana")
-	await create_timer(0.4).timeout
-	root.get_viewport().get_texture().get_image().save_png("%s/panel_ventana_recepcion.png" % salida)
-	escena._panel_abierto.cerrar()
+	for f in [1, 2, 3]:
+		director.silueta_visible = true
+		director.entidad_fase = f
+		director.entidad_parpadeo = 0.0
+		director._silueta_restante = 30.0
+		escena._abrir_panel("ventana")
+		await create_timer(0.4).timeout
+		root.get_viewport().get_texture().get_image().save_png("%s/panel_ventana_entidad_fase%d.png" % [salida, f])
+		escena._panel_abierto.cerrar()
+		await create_timer(0.2).timeout
 	director.silueta_visible = false
 	await create_timer(0.2).timeout
 	escena._abrir_panel("ventana_secreta")
@@ -127,12 +197,11 @@ func _initialize() -> void:
 	root.get_viewport().get_texture().get_image().save_png("%s/panel_ventana_secreta.png" % salida)
 	escena._panel_abierto.cerrar()
 	await create_timer(0.2).timeout
-	# Último dígito: viento y manchas en el pasillo de la sala 5 (código 7 manchas)
+	# Último glifo: viento y manchas que dibujan Andrómeda en el pasillo de la sala 5
 	for i in 4:
 		estado.solicitar()
-		estado.confirmar(i, estado.codigo[i])
+		estado.confirmar(i, estado.glifos[i])
 	estado.solicitar()
-	estado.codigo[4] = 7
 	escena._mostrar_sala("oficina")
 	await create_timer(0.5).timeout
 	root.get_viewport().get_texture().get_image().save_png("%s/anom_oficina_viento_hud.png" % salida)
@@ -141,9 +210,9 @@ func _initialize() -> void:
 	root.get_viewport().get_texture().get_image().save_png("%s/panel_ventana_secreta_manchas.png" % salida)
 	escena._panel_abierto.cerrar()
 	await create_timer(0.2).timeout
-	estado.nueva_partida()
+	estado.nueva_partida(); estado.vigilancia_abierta = true; estado.tiene_tarjeta = true
 	estado.solicitar()
-	estado.confirmar(0, estado.codigo[0])
+	estado.confirmar(0, estado.glifos[0])
 	estado.solicitar()
 	escena._mostrar_sala("laboratorio")
 	await create_timer(0.3).timeout
@@ -151,7 +220,7 @@ func _initialize() -> void:
 	await create_timer(0.4).timeout
 	escena._panel_abierto._archivos()
 	await create_timer(0.3).timeout
-	root.get_viewport().get_texture().get_image().save_png("%s/panel_terminal_codigo.png" % salida)
+	root.get_viewport().get_texture().get_image().save_png("%s/panel_terminal_glifos.png" % salida)
 	escena._panel_abierto.cerrar()
 	await create_timer(0.2).timeout
 	escena._mostrar_sala("laboratorio")
@@ -163,11 +232,6 @@ func _initialize() -> void:
 	root.get_viewport().get_texture().get_image().save_png("%s/sala_habitacion_tumbado_rojo.png" % salida)
 	await create_timer(3.4).timeout
 	root.get_viewport().get_texture().get_image().save_png("%s/sala_habitacion_levantandose_rojo.png" % salida)
-	estado.ayuda_pitidos = true
-	escena._funcion("mesita")
-	await create_timer(0.4).timeout
-	root.get_viewport().get_texture().get_image().save_png("%s/panel_mesita_nota.png" % salida)
-	escena._panel_abierto.cerrar()
 	await create_timer(0.2).timeout
 	escena._abrir_panel("ficha_14b")
 	await create_timer(0.4).timeout
@@ -176,7 +240,7 @@ func _initialize() -> void:
 	# Modo 3: sombra con botón AGACHARSE
 	estado.modo_desbloqueado = 3
 	estado.modo = 3
-	estado.nueva_partida()
+	estado.nueva_partida(); estado.vigilancia_abierta = true; estado.tiene_tarjeta = true
 	escena._mostrar_sala("vigilancia")
 	await create_timer(0.3).timeout
 	director._iniciar_advertencia()
@@ -215,7 +279,7 @@ func _initialize() -> void:
 	# Final del modo 3: hoja tachada y texto de sangre.
 	estado.modo_desbloqueado = 3
 	estado.modo = 3
-	estado.nueva_partida()
+	estado.nueva_partida(); estado.vigilancia_abierta = true; estado.tiene_tarjeta = true
 	var fin = load("res://escenas/final.tscn").instantiate()
 	root.add_child(fin)
 	await create_timer(3.2).timeout

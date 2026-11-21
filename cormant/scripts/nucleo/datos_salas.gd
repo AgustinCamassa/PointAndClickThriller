@@ -53,9 +53,8 @@ static func obtener(id: String) -> Dictionary:
 						"Cerrada con llave. Se oye una radio al otro lado.", MARRON),
 					_h("recepcion", "puerta_der", "Puerta cerrada", "texto",
 						"Un teclado de acceso parpadea en azul junto a la puerta. Se oye un zumbido eléctrico.", MARRON),
-					_h("recepcion", "pc1", "Ordenador 1", "texto", "Un registro de visitas. Ninguna tiene hora de salida.", OBJETO),
-					_h("recepcion", "numero", "Frente del mostrador", "funcion", "numero_recepcion", OBJETO),
-					_h("recepcion", "pc2", "Ordenador 2", "texto", "SIN SEÑAL", OBJETO),
+					_h("recepcion", "pc1", "Ordenador 1", "funcion", "pc_correo", OBJETO),
+					_h("recepcion", "pc2", "Ordenador 2", "funcion", "pc_senal", OBJETO),
 					_h("recepcion", "vuelta", "Darse la vuelta", "ir", "recepcion_reverso", VOLVER),
 				],
 			}
@@ -67,7 +66,6 @@ static func obtener(id: String) -> Dictionary:
 				"hotspots": [
 					_h("recepcion_reverso", "puerta_entrada", "Puerta de entrada", "texto",
 						"Cerrada. No recuerdo haberla cruzado.", MARRON),
-					_h("recepcion_reverso", "vuelta", "Darse la vuelta", "ir", "recepcion", VOLVER),
 				],
 			}
 		"pasillo":
@@ -76,7 +74,6 @@ static func obtener(id: String) -> Dictionary:
 				"color": Color(0.14, 0.15, 0.17),
 				"musica": "ambiente_pasillo",
 				"hotspots": [
-					_h("pasillo", "puerta_recepcion", "Volver a Recepción", "ir", "recepcion", ROJO),
 					_h("pasillo", "puerta_bloq1", "Puerta cerrada", "texto",
 						"El cristal está empañado por el frío. Hay gotas de condensación del lado de dentro.", MARRON),
 					_h("pasillo", "puerta_vigilancia", "Vigilancia", "ir", "vigilancia", ROJO),
@@ -93,8 +90,8 @@ static func obtener(id: String) -> Dictionary:
 				"alicia": ZonasFondos.ALICIA["vigilancia"],
 				"hotspots": [
 					_h("vigilancia", "monitores", "Terminal de vigilancia", "panel", "camaras", OBJETO),
-					_h("vigilancia", "cuaderno", "Cuaderno de mantenimiento", "panel", "cuaderno", OBJETO),
-					_h("vigilancia", "archivero", "Archivero", "texto", "Carpetas vacías. Alguien se ha llevado lo importante.", OBJETO),
+					_h("vigilancia", "cuaderno", "Notas de turno", "panel", "cuaderno", OBJETO),
+					_h("vigilancia", "archivero", "Archivero", "funcion", "archivero", OBJETO),
 					_h("vigilancia", "ventana", "Ventana", "panel", "ventana", OBJETO),
 					_h("vigilancia", "puerta_pasillo", "Pasillo", "ir", "pasillo", ROJO),
 				],
@@ -113,7 +110,6 @@ static func obtener(id: String) -> Dictionary:
 					_h("laboratorio", "puerta_oficina", "Oficina", "ir", "oficina", ROJO),
 					_h("laboratorio", "armario", "Estantería de muestras", "texto",
 						"Muestras con fechas. Varias etiquetas están rascadas.", OBJETO),
-					_h("laboratorio", "volver", "Volver al pasillo", "ir", "pasillo", VOLVER),
 				],
 			}
 		"oficina":
@@ -123,12 +119,11 @@ static func obtener(id: String) -> Dictionary:
 				"musica": "ambiente_oficina",
 				"alicia": ZonasFondos.ALICIA["oficina"],
 				"hotspots": [
-					_h("oficina", "mostrador", "Documentos del mostrador", "texto", "Hojas de turnos sin firmar. Todas dicen N01.", OBJETO),
+					_h("oficina", "mostrador", "Documentos del mostrador", "texto", "Hojas de turnos sin firmar. Todas dicen N01. En la última, la hora de salida está escrita dos veces, con letras distintas.", OBJETO),
 					_h("oficina", "ventana_secreta", "Ventana al pasillo", "panel", "ventana_secreta", OBJETO),
 					_h("oficina", "puerta_azul", "Puerta azul", "funcion", "puerta_azul", AZUL),
 					_h("oficina", "tablero", "Tablón de avisos", "texto",
 						"Normas de seguridad y avisos de personal, unos sobre otros. Hay una chincheta sola, sin nada que sujetar.", OBJETO),
-					_h("oficina", "volver", "Volver al laboratorio", "ir", "laboratorio", VOLVER),
 				],
 			}
 		"habitacion_secreta":
@@ -156,7 +151,6 @@ static func obtener(id: String) -> Dictionary:
 			return {
 				"nombre": "Pasillo (14-B)",
 				"color": Color(0.12, 0.09, 0.09),
-				"parpadeo_mitad": true,
 				"musica": "ambiente_pasillo_alterado",
 				"hotspots": [
 					_h("pasillo_alterado", "placa", "Placa", "texto", "14-B", OBJETO),
@@ -165,7 +159,7 @@ static func obtener(id: String) -> Dictionary:
 					_h("pasillo_alterado", "puerta_morada", "Puerta morada", "texto",
 						"No quiero volver ahí.", MORADO),
 					_h("pasillo_alterado", "huellas", "Huellas", "texto",
-						"Huellas en el suelo, ya marcadas. Todas llevan a la puerta azul.", OBJETO),
+						"Huellas en el suelo, ya marcadas. Todas llevan a la puerta azul. No sé decir si son mías.", OBJETO),
 					_h("pasillo_alterado", "puerta_azul", "Puerta azul", "ir", "oficina", AZUL),
 				],
 			}

@@ -5,6 +5,7 @@ extends Control
 signal cerrado
 
 var titulo := ""
+var es_ordenador := false     # true: se apaga con el apagón (se cierra solo)
 var contenido: Control
 
 

@@ -15,7 +15,7 @@ func comprobar(condicion: bool, texto: String) -> void:
 
 func _ready() -> void:
 	await get_tree().process_frame
-	EstadoJuego.nueva_partida()
+	EstadoJuego.nueva_partida(); EstadoJuego.vigilancia_abierta = true; EstadoJuego.tiene_tarjeta = true
 	print("== Cámaras")
 	var panel := PanelCamaras.crear()
 	add_child(panel)
@@ -26,7 +26,7 @@ func _ready() -> void:
 	var escena = load("res://escenas/escenario.tscn").instantiate()
 	add_child(escena)
 	await get_tree().process_frame
-	EstadoJuego.nueva_partida()
+	EstadoJuego.nueva_partida(); EstadoJuego.vigilancia_abierta = true; EstadoJuego.tiene_tarjeta = true
 	escena._mostrar_sala("vigilancia")
 	await get_tree().process_frame
 	escena._abrir_panel("camaras")
@@ -54,7 +54,7 @@ func _ready() -> void:
 	comprobar(Director.terminal_lab_ocupado() or EstadoJuego.confirmados == 1 or true, "terminal del laboratorio construye los 5 espacios")
 	Director.bloqueo_lab = 0.0
 	term.queue_free()
-	EstadoJuego.nueva_partida()
+	EstadoJuego.nueva_partida(); EstadoJuego.vigilancia_abierta = true; EstadoJuego.tiene_tarjeta = true
 	var cam := VistaCamara.new()
 	cam.size = Vector2(800, 450)
 	add_child(cam)
@@ -75,31 +75,34 @@ func _ready() -> void:
 	for id in ["1", "2"]:
 		cam.seleccionar(id)
 		await get_tree().process_frame
-		comprobar(true, "dibuja el dígito resuelto en cámara " + id)
+		comprobar(true, "dibuja el glifo resuelto en cámara " + id)
 	print("== Susurro por el canal derecho")
 	Sonido.bucle("susurro_derecha", -3.0, Sonido.BUS_DERECHA)
 	var bus := AudioServer.get_bus_index("Derecha")
 	comprobar(bus >= 0 and AudioServer.get_bus_effect(bus, 0) is AudioEffectPanner and AudioServer.get_bus_effect(bus, 0).pan == 1.0, "bus derecho con panorámica total")
 	Sonido.detener_bucle("susurro_derecha")
-	print("== Pitidos en la cámara 3")
-	EstadoJuego.nueva_partida()
+	print("== Glifo en la estática de la cámara 3")
+	EstadoJuego.nueva_partida(); EstadoJuego.vigilancia_abierta = true; EstadoJuego.tiene_tarjeta = true
 	for i in 3:
 		EstadoJuego.solicitar()
-		EstadoJuego.confirmar(i, EstadoJuego.codigo[i])
+		EstadoJuego.confirmar(i, EstadoJuego.glifos[i])
 	EstadoJuego.solicitar()
 	Director.forzar("pitidos")
 	cam.seleccionar("1")
 	for i in 80:
 		cam._contar_pitidos(0.1)
-	comprobar(not Director.pitidos_escuchados, "en otra cámara no se oyen")
+	comprobar(not Director.pitidos_escuchados, "en otra cámara no se registra")
 	cam.seleccionar("3")
-	var necesario := Director.segundos_pitidos(Director.pitidos_digito())
+	var necesario: float = Director.SEGUNDOS_ESTATICA
 	for i in int(necesario * 10.0) - 10:
 		cam._contar_pitidos(0.1)
-	comprobar(not Director.pitidos_escuchados, "oír solo una parte no basta")
+	comprobar(not Director.pitidos_escuchados, "mirar solo una parte no basta")
 	for i in 30:
 		cam._contar_pitidos(0.1)
-	comprobar(Director.pitidos_escuchados, "oír una vuelta completa queda registrado")
+	comprobar(Director.pitidos_escuchados, "mirar la estática el tiempo suficiente queda registrado")
+	cam.seleccionar("3")
+	await get_tree().process_frame
+	comprobar(true, "dibuja el glifo en la estática de la cámara 3")
 	cam.queue_free()
 	print("== Resultado: ", "TODO OK" if fallos == 0 else "%d FALLOS" % fallos)
 	get_tree().quit(fallos)

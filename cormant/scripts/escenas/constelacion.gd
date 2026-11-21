@@ -16,7 +16,7 @@ const ESCALA := 17.0
 
 var conseguidas: Array = []
 var nueva := ""                   # estrella que aparece con fundido al entrar al título
-var origen := Vector2(529, 22)
+var origen := Vector2(470, 34)   # dentro del cielo del fondo: sobre el tejado, a la izquierda de la luna
 var _alfa := {}                   # id -> opacidad actual
 var _linea := 0.0
 var _t := 0.0

@@ -1,9 +1,9 @@
 class_name VistaCamara
 extends Control
 ## Pantalla CRT de una cámara (filtro verde). Dibuja la vista, estática y las señales de los eventos.
-## Cámara 1: laboratorio (cuadro girado 180°; el dígito del retrato aparece sobre el cuadro al resolverlo).
-## Cámara 2: pasillo (mancha; el dígito de la mancha aparece escrito donde estaba, solo aquí).
-## Cámara 3: SIN SEÑAL; parpadea y emite audio con susurros o con pitidos (N pitidos = dígito N).
+## Cámara 1: laboratorio (con la anomalía del cuadro enseña el laboratorio macabro y el cuadro macabro; el glifo del retrato aparece sobre el cuadro normal al resolverla).
+## Cámara 2: pasillo (mancha; el glifo de la mancha aparece trazado donde estaba, solo aquí).
+## Cámara 3: SIN SEÑAL; parpadea y emite audio con susurros o con pitidos; con los pitidos, suenan tantos como estrellas tiene la constelación (no se dibuja nada).
 
 const NOMBRES := {
 	"1": "CAM 1 · LABORATORIO",
@@ -28,7 +28,7 @@ var _destello_gris := false
 var _proximo_destello := 0.0
 var _audio_activo := false
 var _pitidos_sonando := ""
-var _oido := 0.0               # segundos de pitidos escuchados seguidos en la cámara 3
+var _oido := 0.0               # segundos mirando la estática de la cámara 3 mientras emite
 
 
 func seleccionar(id: String) -> void:
@@ -70,17 +70,17 @@ func _parar_pitidos() -> void:
 
 
 func _contar_pitidos(delta: float) -> void:
-	## Los pitidos solo cuentan si se escuchan enteros mirando la cámara 3.
+	## El glifo solo cuenta si se mira la cámara 3 el tiempo suficiente mientras emite (los pitidos son ambiente).
 	if not _pitidos_audibles():
 		_parar_pitidos()
 		return
-	var nombre := "pitidos_%d" % Director.pitidos_digito()
+	var nombre := "pitidos_%d" % Director.pitidos_cantidad()   # tantos pitidos como estrellas
 	if _pitidos_sonando != nombre:
 		_parar_pitidos()
 		_pitidos_sonando = nombre
 		Sonido.bucle(nombre, -4.0)
 	_oido += delta
-	if _oido >= Director.segundos_pitidos(Director.pitidos_digito()):
+	if _oido >= Director.SEGUNDOS_ESTATICA:
 		Director.pitidos_oidos()
 
 
@@ -119,7 +119,12 @@ func _draw() -> void:
 		_dibujar_cabecera(fuente)
 		return
 	# Vista base
-	var textura := Recursos.fondo(FONDO_TEXTURA[camara])
+	var nombre_fondo: String = FONDO_TEXTURA[camara]
+	if camara == "1" and Director.cuadro_en_camara():
+		nombre_fondo = "cam_1_macabro"
+	var textura := Recursos.fondo(nombre_fondo)
+	if textura == null and nombre_fondo != FONDO_TEXTURA[camara]:
+		textura = Recursos.fondo(FONDO_TEXTURA[camara])
 	if textura != null:
 		draw_texture_rect(textura, Rect2(Vector2.ZERO, size), false)
 	else:
@@ -215,24 +220,26 @@ static func _en_verde(textura: Texture2D, clave: String) -> Texture2D:
 	return t
 
 
-func _dibujar_cuadro(girado: bool) -> void:
+func _dibujar_cuadro(macabro: bool) -> void:
 	var d: Dictionary = ZonasFondos.CAMARAS.get(camara, {})
 	var ancho: float = size.x * d.get("cuadro_ancho", 0.15)
+	var nombre := "cuadro_macabro" if macabro else "cuadro"
+	var textura := Recursos.sprite(nombre)
 	var alto := ancho * 0.7
-	draw_set_transform(_centro_cuadro(), PI if girado else 0.0, Vector2.ONE)
-	var textura := Recursos.sprite("cuadro_recto")
 	if textura != null:
-		draw_texture_rect(_en_verde(textura, "cuadro"), Rect2(-ancho / 2.0, -alto / 2.0, ancho, alto), false)
+		alto = ancho * textura.get_height() / textura.get_width()
+	draw_set_transform(_centro_cuadro(), 0.0, Vector2.ONE)
+	if textura != null:
+		draw_texture_rect(_en_verde(textura, nombre), Rect2(-ancho / 2.0, -alto / 2.0, ancho, alto), false)
 	else:
 		draw_rect(Rect2(-ancho / 2.0, -alto / 2.0, ancho, alto), Color(0.55, 0.5, 0.4))
 		draw_rect(Rect2(-ancho / 2.0 + 8, -alto / 2.0 + 8, ancho - 16, alto - 16), Color(0.2, 0.2, 0.25))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	# El número del laboratorio se ve sobre el cuadro una vez resuelta la anomalía.
-	if EstadoJuego.digito_visible("retrato") and not girado:
-		var fuente := ThemeDB.fallback_font
+	# El glifo del laboratorio se ve sobre el cuadro una vez resuelta la anomalía.
+	if EstadoJuego.glifo_visible("retrato") and not macabro:
 		var c := _centro_cuadro()
-		draw_string(fuente, Vector2(c.x - ancho / 2.0, c.y + alto * 0.22), str(EstadoJuego.digito_de("retrato")),
-			HORIZONTAL_ALIGNMENT_CENTER, ancho, int(alto * 0.8), Color(0.7, 1.0, 0.75, 0.9))
+		Glifos.dibujar(self, EstadoJuego.glifo_de("retrato"), Rect2(c.x - ancho * 0.36, c.y - alto * 0.36, ancho * 0.72, alto * 0.72),
+			Color(0.7, 1.0, 0.75, 0.9), maxf(2.0, ancho * 0.02), 1.5)
 
 
 func _centro_mancha() -> Vector2:
@@ -246,18 +253,18 @@ func _dibujar_pasillo(fuente: Font) -> void:
 	var ancho: float = size.x * d.get("mancha_ancho", 0.14)
 	var centro := _centro_mancha()
 	if Director.mancha_en_camara():
-		var textura := Recursos.sprite("mancha_suelo")
-		var rect := Rect2(centro - Vector2(ancho, ancho / 3.0) / 2.0, Vector2(ancho, ancho / 3.0))
-		if textura != null:
-			draw_texture_rect(_en_verde(textura, "mancha"), rect, false)
-		else:
-			draw_rect(rect, Color(0.25, 0.08, 0.08))
+		# La anomalía de la sangre es el fondo entero del pasillo también en esta cámara.
+		var fondo_mancha := Recursos.fondo("pasillo_mancha")
+		if fondo_mancha != null:
+			draw_texture_rect(_en_verde(fondo_mancha, "pasillo_mancha"), Rect2(Vector2.ZERO, size), false)
 		if Director.evento_de("mancha") != null and int(_t * 3.0) % 2 == 0:
 			_marca_aviso(fuente, centro + Vector2(ancho * 0.6, -size.y * 0.12))
-	elif EstadoJuego.digito_visible("mancha"):
-		# Escrito en el suelo donde estaba la mancha; solo se ve desde esta cámara.
-		draw_string(fuente, Vector2(centro.x - ancho / 2.0, centro.y + ancho * 0.18), str(EstadoJuego.digito_de("mancha")),
-			HORIZONTAL_ALIGNMENT_CENTER, ancho, int(ancho * 0.55), Color(0.35, 0.85, 0.5, 0.9))
+	elif EstadoJuego.glifo_visible("mancha"):
+		# Trazado en el suelo donde estaba la mancha; solo se ve desde esta cámara. Cuadrado y de tamaño legible
+		# (antes era un rectángulo pequeño de verde sobre verde, casi invisible con el filtro).
+		var lado := ancho * 1.05
+		Glifos.dibujar(self, EstadoJuego.glifo_de("mancha"), Rect2(centro.x - lado / 2.0, centro.y - lado * 0.85, lado, lado),
+			Color(0.85, 1.0, 0.9, 1.0), maxf(4.0, ancho * 0.035), maxf(3.0, ancho * 0.03))
 
 
 func _dibujar_ruido(fuerza: float) -> void:

@@ -166,6 +166,39 @@ def detector_bip():
     return lp(x, 6000)
 
 
+def detector_alarma():
+    """Pitido grave y suave (unos 620 Hz con leve trémolo), distinto de los 1900 Hz del aviso y de los 1000 Hz de la CAM 3."""
+    n = int(0.22*SR); tt = np.arange(n)/SR
+    x = (np.sin(2*np.pi*620*tt) + 0.3*np.sin(2*np.pi*930*tt))*(0.8+0.2*np.sin(2*np.pi*22*tt))*env_ad(n, 0.01, 0.12)
+    return lp(x, 2500)*0.6
+
+
+def tecla():
+    n = int(0.06*SR); tt = np.arange(n)/SR
+    return (bp(rng.randn(n), 1500, 5000)*0.5 + np.sin(2*np.pi*1100*tt)*0.4)*env_ad(n, 0.001, 0.035)*0.8
+
+
+def apagon_inicio():
+    """Corte de corriente: golpe grave, caída de tono (220 -> 35 Hz) y chasquido de relés."""
+    L = 1.4; n = int(L*SR); tt = np.arange(n)/SR
+    f = 35 + 185*np.exp(-tt*3.2)
+    x = np.sin(2*np.pi*np.cumsum(f)/SR)*np.exp(-tt*1.6)*0.9
+    x += 0.5*bp(rng.randn(n), 80, 900)*np.exp(-tt*18)
+    x += 0.35*np.sign(np.sin(2*np.pi*55*tt))*np.exp(-tt*5)
+    x += 0.25*bp(rng.randn(n), 2500, 6000)*np.exp(-((tt-0.08)**2)/0.0004)
+    return reverb(lp(x, 3000), 1.4, 0.3)*0.9
+
+
+def apagon_fin():
+    """Vuelve la corriente: chasquido y zumbido que sube de 40 a 110 Hz hasta estabilizarse."""
+    L = 1.1; n = int(L*SR); tt = np.arange(n)/SR
+    f = 40 + 70*(1-np.exp(-tt*5))
+    x = np.sin(2*np.pi*np.cumsum(f)/SR)*0.5*np.minimum(1, tt/0.1)*np.minimum(1, (L-tt)/0.4)
+    x += 0.3*np.sin(2*np.pi*50*tt)*np.minimum(1, (L-tt)/0.5)
+    x += 0.6*bp(rng.randn(n), 1800, 7000)*np.exp(-tt*60)
+    return lp(x, 4000)*0.8
+
+
 def susurro_terminal():
     x = susurro_base(1.8, 7, 31)
     x = bp(x, 400, 3200)+0.05*bp(rng.randn(len(x)), 800, 3000)
@@ -217,6 +250,37 @@ def pasos_entidad():
         x[a:a+m] += paso[:max(0, min(m, n-a))]
     return reverb(x, 1.3, 0.3)
 
+def entidad_acecho():
+    """Silueta que se acerca a la ventana de Vigilancia: chirrido agudo que sube, trémolo metálico y golpe grave final.
+    Más estridente que pasos_entidad y que advertencia_entidad. Dura ~4,6 s (las 3 fases + el castigo)."""
+    r = np.random.RandomState(52)
+    L = 4.6; n = int(L*SR); tt = np.arange(n)/SR
+    prog = tt/L
+    f1 = 880 + 760*prog**1.5
+    f2 = f1*1.0595*1.5            # segunda voz disonante (quinta + semitono)
+    fase1 = 2*np.pi*np.cumsum(f1)/SR
+    fase2 = 2*np.pi*np.cumsum(f2)/SR
+    trem = 0.55 + 0.45*np.sin(2*np.pi*(6 + 14*prog)*tt)
+    chirrido = (np.sin(fase1) + 0.6*np.sin(fase2) + 0.25*np.sin(3*fase1))*trem*(0.25 + 0.75*prog)
+    raspa = bp(r.randn(n), 2500, 7500)*(0.15 + 0.85*prog**2)*(0.5 + 0.5*np.sin(2*np.pi*9*tt))
+    sub = np.sin(2*np.pi*(42 + 12*prog)*tt)*(0.4 + 0.6*prog)
+    x = (0.5*chirrido + 0.35*raspa + 0.7*sub)*np.minimum(1, tt/0.12)
+    x *= np.minimum(1, (L - tt)/0.25)
+    return reverb(x, 1.4, 0.25)
+def musica_modo3():
+    """Modo 3: colchón grave y oscuro que no tapa las pistas (todo por debajo de ~260 Hz, salvo una cola de aire muy suave).
+    Dos graves en disonancia que baten despacio, un latido lejano y un oleaje de ruido filtrado. Bucle de 24 s."""
+    L = 24
+    base = 0.55*tono_p(L, 41.2) + 0.5*tono_p(L, 43.65)*(0.7 + 0.3*tono_p(L, 0.125)) + 0.3*tono_p(L, 61.7)*(0.5 + 0.5*tono_p(L, 0.25, 1.3))
+    base += 0.18*tono_p(L, 123.5)*(0.3 + 0.7*np.abs(tono_p(L, 0.0833)))     # armónico que respira
+    oleaje = lp(ruido_periodico(L, 40, 230, -1, 41), 230)*(0.4 + 0.6*np.abs(tono_p(L, 0.125, 0.6)))*0.5
+    aire = lp(ruido_periodico(L, 1500, 5000, -1, 42), 5000)*0.04*(0.3 + 0.7*np.abs(tono_p(L, 0.0833, 2.0)))
+    x = base + oleaje + aire
+    for p in (1.5, 4.5, 7.5, 10.5, 13.5, 16.5, 19.5, 22.5):        # latido lejano, lento, muy grave
+        m = int(0.5*SR); tt = np.arange(m)/SR
+        anillo(x, p, 0.6*np.sin(2*np.pi*(52 - 20*tt/0.5)*tt)*np.exp(-tt/0.12))
+        anillo(x, p + 0.32, 0.35*np.sin(2*np.pi*(48 - 18*tt/0.5)*tt)*np.exp(-tt/0.1))
+    return lp(x, 4000)
 def cambio_camara():
     n = int(0.3*SR); tt = np.arange(n)/SR
     clic = np.sign(rng.randn(int(0.01*SR)))*0.8
@@ -291,16 +355,17 @@ if __name__ == "__main__":
         "ambiente_tramo_1": (lambda: ambiente_tramo(1), 0.3), "ambiente_tramo_2": (lambda: ambiente_tramo(2), 0.35),
         "ambiente_tramo_3": (lambda: ambiente_tramo(3), 0.4),
         "tono_grave": (tono_grave, 0.5), "susurro_fijo": (lambda: cerrar_bucle(susurro_fijo(), 12), 0.5), "musica_titulo": (lambda: cerrar_bucle(musica_titulo(), 32), 0.5),
-        "latido": (latido, 0.8), "viento": (viento, 0.5), "susurro_derecha": (lambda: cerrar_bucle(susurro_derecha(), 10), 0.85),
+        "latido": (latido, 0.8), "musica_modo3": (musica_modo3, 0.5), "viento": (viento, 0.5), "susurro_derecha": (lambda: cerrar_bucle(susurro_derecha(), 10), 0.85),
     }
     efectos = {
-        "alerta_terminal": (alerta_terminal, 0.7), "detector_bip": (detector_bip, 0.6), "susurro_terminal": (susurro_terminal, 0.6),
+        "alerta_terminal": (alerta_terminal, 0.7), "detector_bip": (detector_bip, 0.6), "detector_alarma": (detector_alarma, 0.5), "apagon_inicio": (apagon_inicio, 0.9), "apagon_fin": (apagon_fin, 0.8), "tecla": (tecla, 0.5), "susurro_terminal": (susurro_terminal, 0.6),
         "susurro_pasillo": (susurro_pasillo, 0.6), "estatica_breve": (estatica_breve, 0.6),
         "confirmacion": (confirmacion, 0.55), "error_terminal": (error_terminal, 0.65),
         "golpe_grave": (golpe_grave, 0.9), "advertencia_entidad": (advertencia_entidad, 0.8),
-        "pasos_entidad": (pasos_entidad, 0.9),
+        "pasos_entidad": (pasos_entidad, 0.9), "entidad_acecho": (entidad_acecho, 0.85),
         "cambio_camara": (cambio_camara, 0.5), "papel": (papel, 0.5), "puerta": (puerta, 0.7),
-        **{"pitidos_%d" % i: ((lambda k=i: pitidos(k)), 0.5) for i in range(10)},
+        # CAM 3: tantos pitidos como estrellas tiene la constelación del puzzle (4 a 9), en bucle
+        **{"pitidos_%d" % n: ((lambda n=n: pitidos(n)), 0.5) for n in range(4, 10)},
         "pitido_plano": (pitido_plano, 0.5), "tono_revelacion": (tono_revelacion, 0.7),
     }
     # python3 audio.py nombre1 nombre2 -> genera solo esos
