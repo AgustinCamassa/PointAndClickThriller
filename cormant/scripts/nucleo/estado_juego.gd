@@ -8,6 +8,8 @@ signal fragmento_oculto(id: String)
 signal glifos_cambiado
 signal partida_nueva
 signal detector_obtenido
+signal ayudas_cambiadas
+signal sangre_cambiada
 
 ## Segundos en los que empieza cada tramo de presión (valores provisionales).
 const INICIO_TRAMOS := [45.0, 180.0, 360.0]
@@ -88,6 +90,17 @@ var vigilancia_abierta := false      # se ha metido el PIN: hasta entonces no co
 var tiene_tarjeta := false          # tarjeta de seguridad del archivero de Vigilancia: abre el laboratorio; se conserva tras morir
 var tiene_detector := false         # se consigue con el primer clic en las cámaras de Vigilancia; se pierde al empezar otra partida
 var invulnerable := false           # solo para el desarrollador (tecla G): ignora todo el daño
+## Ayudas ocultas (no se anuncian en el juego): el cuadro del pasillo da inmunidad y la libreta de la recepción baja la compatibilidad.
+## Cada una se puede usar una vez por partida y solo con la vista normal. En el modo 3 valen menos (1 error perdonado y -15 en vez de 2 y -20).
+var ayuda_cuadro_usada := false
+var ayuda_libreta_usada := false
+var inmunidad := 0                  # errores que aún se perdonan (no suman compatibilidad ni matan)
+var led_blanco := -1                # índice del LED del detector que se ve blanco tras usar la libreta (-1 = ninguno)
+var led_blanco_restante := 0.0      # daño que hay que recibir para que ese LED recupere su color
+var muertes_previas := 0            # muertes en partidas anteriores (se guarda en disco): la siguiente partida abre con un mensaje de sangre
+var sangre_activa := false          # esta partida empieza tras una muerte previa (modos 1 y 2)
+var mensaje_sangre_visto := false   # el mensaje de sangre ya salió en esta partida
+var palabra_cuadro_visible := false   # la 5.ª palabra de la acusación (aquí / quieres / ser) ya está escrita en el cuadro del pasillo macabro
 
 
 func _ready() -> void:
@@ -152,15 +165,35 @@ func cargar_progreso() -> void:
 	if f.load(ruta_progreso) == OK:
 		guia_hecha = bool(f.get_value("progreso", "guia_hecha", false))
 		modo_desbloqueado = clampi(int(f.get_value("progreso", "modo_desbloqueado", 1)), 1, MODOS.size())
+		muertes_previas = maxi(int(f.get_value("progreso", "muertes_previas", 0)), 0)
 		estrellas.clear()
 		for id in f.get_value("progreso", "estrellas", []):
 			if ESTRELLAS.has(str(id)) and not estrellas.has(str(id)):
 				estrellas.append(str(id))
 
 
+## Opciones > Borrar datos: todo el progreso vuelve a empezar (modos, estrellas, partida guía, muertes previas) y se elimina el archivo.
+func borrar_progreso() -> void:
+	modo_desbloqueado = 1
+	guia_hecha = false
+	estrellas.clear()
+	muertes_previas = 0
+	estrella_reciente = ""
+	desbloqueo_reciente = 0
+	if FileAccess.file_exists(ruta_progreso):
+		DirAccess.remove_absolute(ruta_progreso)
+
+
+## Se llama al morir: la siguiente partida empieza con el mensaje de sangre (modos 1 y 2 tras una muerte; el 3 siempre).
+func registrar_muerte_previa() -> void:
+	muertes_previas += 1
+	guardar_progreso()
+
+
 func guardar_progreso() -> void:
 	var f := ConfigFile.new()
 	f.set_value("progreso", "modo_desbloqueado", modo_desbloqueado)
+	f.set_value("progreso", "muertes_previas", muertes_previas)
 	f.set_value("progreso", "guia_hecha", guia_hecha)
 	f.set_value("progreso", "estrellas", estrellas)
 	f.save(ruta_progreso)
@@ -228,6 +261,14 @@ func nueva_partida() -> void:
 	falsas_alarmas = 0
 	ignoradas = 0
 	finalizada = false
+	ayuda_cuadro_usada = false
+	ayuda_libreta_usada = false
+	inmunidad = 0
+	led_blanco = -1
+	led_blanco_restante = 0.0
+	sangre_activa = muertes_previas > 0
+	mensaje_sangre_visto = false
+	palabra_cuadro_visible = false
 	tiene_detector = false
 	tiene_tarjeta = false
 	vigilancia_abierta = false
@@ -269,8 +310,62 @@ func sumar_compatibilidad(cantidad: float, forzado := false) -> void:
 	## Con la invulnerabilidad activa no sube la compatibilidad (salvo que se fuerce a propósito, como hace la tecla F).
 	if invulnerable and cantidad > 0.0 and not forzado:
 		return
+	if cantidad > 0.0 and not forzado and absorber_golpe():
+		return   # la inmunidad del cuadro perdona este error
+	if cantidad > 0.0 and led_blanco >= 0:
+		led_blanco_restante -= cantidad
+		if led_blanco_restante <= 0.0:
+			led_blanco = -1
+			led_blanco_restante = 0.0
+			ayudas_cambiadas.emit()
 	compatibilidad = clampf(compatibilidad + cantidad, 0.0, 100.0)
 	compatibilidad_cambiada.emit(compatibilidad)
+
+
+## Gasta una carga de inmunidad si la hay (devuelve true = el golpe queda perdonado). Lo usan también las muertes directas
+## (silueta con una muerte previa, sombra del modo 2 y 3), que no pasan por sumar_compatibilidad.
+func absorber_golpe() -> bool:
+	if inmunidad <= 0:
+		return false
+	inmunidad -= 1
+	ayudas_cambiadas.emit()
+	return true
+
+
+## LEDs del detector que corresponden a una compatibilidad: 1–15 % → 1; 16–29 → 2; luego una por cada 10 % (90 % o más = las 9).
+static func nivel_detector(c: float) -> int:
+	if c < 1.0:
+		return 0
+	if c < 16.0:
+		return 1
+	if c < 30.0:
+		return 2
+	return clampi(int(floor(c / 10.0 + 0.0001)), 3, 9)
+
+
+## Cuadro del pasillo: perdona 2 errores (1 en el modo 3).
+func usar_ayuda_cuadro() -> bool:
+	if ayuda_cuadro_usada:
+		return false
+	ayuda_cuadro_usada = true
+	inmunidad = 1 if modo >= MODOS.size() else 2
+	ayudas_cambiadas.emit()
+	return true
+
+
+## Libreta de la recepción: resta 20 puntos de compatibilidad (15 en el modo 3) y deja un LED del detector en blanco
+## hasta que se reciba al menos ese daño. Devuelve los puntos restados (0 = no se usó).
+func usar_ayuda_libreta() -> float:
+	if ayuda_libreta_usada:
+		return 0.0
+	ayuda_libreta_usada = true
+	var quitar := 15.0 if modo >= MODOS.size() else 20.0
+	var antes := compatibilidad
+	fijar_compatibilidad(maxf(compatibilidad - quitar, 0.0))
+	led_blanco_restante = antes - compatibilidad
+	led_blanco = nivel_detector(compatibilidad) - 1 if led_blanco_restante > 0.0 else -1   # el último LED encendido tras restar
+	ayudas_cambiadas.emit()
+	return led_blanco_restante
 
 
 func fijar_compatibilidad(valor: float) -> void:

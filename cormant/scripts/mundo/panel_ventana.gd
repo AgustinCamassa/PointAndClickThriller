@@ -13,8 +13,11 @@ var _silueta_restante := 0.0
 var _cristal: ColorRect
 var _tr_fondo: TextureRect
 var _manchas: Array[Control] = []
+var _oscuro: ColorRect   # velo oscuro sobre el pasillo mientras asoma la silueta (que no parezca pegada)
+var _tween_silueta: Tween
 ## Zona del suelo del pasillo (relativa al cristal) donde las manchas dibujan el glifo: ancha y baja, por la perspectiva.
-const AREA_GLIFO_SUELO := Rect2(110, 385, 700, 135)
+## Centrada en la puerta del fondo (x = 462) y dentro de las paredes: antes (110, 385, 700, 135) llegaba a tocar el muro derecho.
+const AREA_GLIFO_SUELO := Rect2(190, 395, 540, 105)
 
 
 static func crear(tipo_: String) -> PanelVentana:
@@ -57,6 +60,12 @@ func _construir() -> void:
 	if tipo == "recepcion":
 		_construir_entidad(cristal)
 	else:
+		_oscuro = ColorRect.new()
+		_oscuro.position = cristal.position
+		_oscuro.size = cristal.size
+		_oscuro.color = Color(0, 0, 0, 0)
+		_oscuro.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		contenido.add_child(_oscuro)
 		_silueta = Alicia.new()
 		# Pies (x, y) y alto relativos al cristal.
 		var v: Vector3 = ZonasFondos.SILUETA_SECRETO
@@ -153,6 +162,33 @@ func _al_cambiar_silueta(visible_: bool) -> void:
 			_silueta.aparecer(0.05)
 
 
+## La silueta asoma entre parpadeos mientras el pasillo se oscurece: así se funde con la escena en vez de aparecer de golpe.
+func _mostrar_silueta() -> void:
+	if _tween_silueta != null and _tween_silueta.is_valid():
+		_tween_silueta.kill()
+	var tinte := Color(0.55, 0.58, 0.64)
+	_silueta.visible = true
+	_silueta.modulate = Color(tinte.r, tinte.g, tinte.b, 0.0)
+	var t := create_tween()
+	_tween_silueta = t
+	t.tween_property(_oscuro, "color:a", 0.45, 0.5)
+	t.parallel().tween_property(_silueta, "modulate:a", 0.3, 0.5)
+	t.tween_property(_silueta, "modulate:a", 0.0, 0.07)
+	t.tween_property(_silueta, "modulate:a", 0.55, 0.25)
+	t.tween_property(_silueta, "modulate:a", 0.15, 0.07)
+	t.tween_property(_silueta, "modulate", Color(1, 1, 1, Alicia.ALFA_ENTIDAD), 0.6)
+
+
+func _ocultar_silueta() -> void:
+	if _tween_silueta != null and _tween_silueta.is_valid():
+		_tween_silueta.kill()
+	var t := create_tween()
+	_tween_silueta = t
+	t.tween_property(_silueta, "modulate:a", 0.0, 0.5)
+	t.parallel().tween_property(_oscuro, "color:a", 0.0, 0.8)
+	t.tween_callback(func(): _silueta.visible = false)
+
+
 func _actualizar_manchas() -> void:
 	## Con el viento, las manchas del suelo dibujan el último glifo (Andrómeda), unidas por trazos tenues; se desvanecen solas.
 	var debe := Director.manchas_viento_visibles()
@@ -184,7 +220,7 @@ func _process(delta: float) -> void:
 	if _silueta_restante > 0.0:
 		_silueta_restante -= delta
 		if _silueta_restante <= 0.0:
-			_silueta.visible = false
+			_ocultar_silueta()
 		return
 	if EstadoJuego.compatibilidad < Director.UMBRAL_ADVERTENCIA:
 		return
@@ -192,8 +228,7 @@ func _process(delta: float) -> void:
 	if _temporizador <= 0.0:
 		_temporizador = randf_range(6.0, 12.0)
 		if randf() < 0.5:
-			_silueta.visible = true
-			_silueta.aparecer(0.05)
+			_mostrar_silueta()
 			_silueta_restante = 2.0
 			Sonido.reproducir("estatica_breve")
 

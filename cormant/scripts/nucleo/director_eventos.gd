@@ -628,7 +628,10 @@ func _castigo_entidad() -> void:
 	_quitar_entidad()
 	Sonido.reproducir("golpe_grave")
 	if EstadoJuego.muertes > 0:
-		morir()
+		if EstadoJuego.absorber_golpe():
+			mensaje.emit("La silueta cruzó el cristal. Esta vez no me alcanzó.")
+		else:
+			morir()
 	else:
 		EstadoJuego.sumar_compatibilidad(ENTIDAD_PENALIZA_PREVIA if EstadoJuego.silueta_en_rodaje() else ENTIDAD_PENALIZA)
 		mensaje.emit("La silueta cruzó el cristal. Algo me atravesó.")
@@ -806,7 +809,48 @@ func forzar(tipo: String) -> void:
 	_crear(tipo)
 
 
+## Acusaciones de sangre (5 palabras por dificultad): 4 se escriben en las placas de las puertas del pasillo macabro y la 5.ª, a la vez, sobre el cuadro.
+## Salen una vez por partida, con la primera anomalía que cumple la condición. No hay texto flotante en pantalla.
+##  - Modo 1: «Sabes lo que haces» + «aquí».   Modo 2: «No haces lo que» + «quieres».
+##    Solo si la partida empieza tras una muerte previa, la anomalía es la del pasillo central (la mancha, real: una falsa alarma no la gasta) y la compatibilidad es de 80 % o más.
+##  - Modo 3: «No eres quien crees» + «ser», siempre, en la primera anomalía.
+##  (Frase oculta con las palabras del cuadro, modo 1 -> 2 -> 3: «AQUÍ QUIERES SER».)
+func _acusacion(tipo: String, real := true) -> void:
+	if EstadoJuego.mensaje_sangre_visto or not EstadoJuego.jugando:
+		return
+	if EstadoJuego.modo != 3 and not (EstadoJuego.sangre_activa and tipo == "mancha" and real and EstadoJuego.compatibilidad >= 80.0):
+		return
+	EstadoJuego.mensaje_sangre_visto = true
+	EstadoJuego.palabra_cuadro_visible = true
+	EstadoJuego.sangre_cambiada.emit()   # el escenario cambia las placas y escribe la palabra del cuadro a la vez
+
+
+## Fondo macabro del pasillo que toca (placas de las puertas):
+##  - Sin acusación: placas rasguñadas (modos 1 y 2).  Modo 1: SABES · LO · QUE · HACES.  Modo 2: NO · HACES · LO · QUE.
+##  - Modo 3: carteles normales antes de la primera anomalía; después NO · ERES · QUIEN · CREES; al solicitar el 3.er glifo, SABES · LO · QUE · PASÓ.
+func nombre_pasillo_macabro() -> String:
+	if invertido():
+		if EstadoJuego.solicitados >= 3:
+			return "pasillo_macabro_m3"
+		return "pasillo_macabro_m3_eres" if EstadoJuego.palabra_cuadro_visible else "pasillo_macabro_m3_previo"
+	if EstadoJuego.mensaje_sangre_visto:
+		return "pasillo_macabro_haces" if EstadoJuego.modo == 1 else "pasillo_macabro_quieres"
+	return "pasillo_macabro"
+
+
+## Sprite de la 5.ª palabra sobre el cuadro (imagen 1280x720 con la palabra ya en perspectiva).
+func sprite_palabra_cuadro() -> String:
+	match EstadoJuego.modo:
+		1:
+			return "res://assets/sprites/sangre_cuadro_aqui.png"
+		2:
+			return "res://assets/sprites/sangre_cuadro_quieres.png"
+	return "res://assets/sprites/sangre_cuadro_ser.png"
+
+
 func _crear(tipo: String) -> void:
+	if EstadoJuego.modo == 3:
+		_acusacion(tipo)   # modo 3: con la primera anomalía, sea cual sea (aunque luego no tenga evento propio)
 	# Modo 3: el contador de la sombra avanza con cada anomalía (con SOMBRA_SOLO_VIGILANCIA, solo estando en Vigilancia).
 	if not SOMBRA_SOLO_VIGILANCIA or EstadoJuego.sala_actual == "vigilancia":
 		anomalias_desde_sombra += 1
@@ -826,6 +870,8 @@ func _crear(tipo: String) -> void:
 	var real := fijas.has(tipo) or rng.randf() >= PROBABILIDAD_FALSO
 	var e := Evento.new(tipo, real, duracion_evento())
 	eventos.append(e)
+	if EstadoJuego.modo != 3:
+		_acusacion(tipo, real)   # modos 1 y 2: solo la mancha real; antes de avisar al escenario, así el fondo macabro ya lleva las placas
 	if not EstadoJuego.tiene_detector:   # con el detector, el aviso lo da él (LEDs y pitido)
 		Sonido.reproducir("alerta_terminal")
 	if tipo == "voz":
@@ -1092,6 +1138,9 @@ func _terminar_advertencia(sobrevivio: bool) -> void:
 		proximo_aviso = rng.randf_range(20.0, 30.0)
 		mensaje.emit("La sombra me atraviesa.")
 		Sonido.reproducir("golpe_grave")
+	elif EstadoJuego.absorber_golpe():
+		proximo_aviso = rng.randf_range(20.0, 30.0)   # la inmunidad del cuadro perdona la sombra
+		mensaje.emit("Pasó de largo.")
 	else:
 		morir()
 
@@ -1109,6 +1158,7 @@ func morir() -> void:
 		return
 	EstadoJuego.jugando = false
 	EstadoJuego.muertes += 1
+	EstadoJuego.registrar_muerte_previa()
 	EstadoJuego.fin_guia_por_muerte()
 	eventos.clear()
 	EstadoJuego.reiniciar_terminal()

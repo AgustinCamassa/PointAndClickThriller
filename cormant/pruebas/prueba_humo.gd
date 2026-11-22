@@ -1305,6 +1305,105 @@ func _initialize() -> void:
 	estado.muertes = 0
 	director._reiniciar_apagon()
 
+	print("== Ayudas ocultas (cuadro del pasillo y libreta de la recepción)")
+	estado.modo_desbloqueado = 3
+	estado.modo = 1
+	estado.nueva_partida(); estado.vigilancia_abierta = true
+	estado.fijar_compatibilidad(50.0)
+	var quitado: float = estado.usar_ayuda_libreta()
+	comprobar(quitado == 20.0 and estado.compatibilidad == 30.0, "modo 1: la libreta resta 20 puntos (50 → 30)")
+	comprobar(estado.led_blanco == 2, "el último LED encendido tras restar (el 3.º) se ve blanco")
+	comprobar(estado.usar_ayuda_libreta() == 0.0 and estado.compatibilidad == 30.0, "la libreta solo se usa una vez por partida")
+	estado.sumar_compatibilidad(10.0)
+	comprobar(estado.led_blanco == 2, "con 10 de daño (menos de 20) el LED sigue blanco")
+	estado.sumar_compatibilidad(10.0)
+	comprobar(estado.led_blanco == -1, "al recibir 20 de daño el LED recupera su color")
+	comprobar(estado.usar_ayuda_cuadro() and estado.inmunidad == 2, "modo 1: el cuadro da inmunidad a 2 errores")
+	var comp_antes: float = estado.compatibilidad
+	estado.sumar_compatibilidad(10.0)
+	estado.sumar_compatibilidad(10.0)
+	comprobar(estado.compatibilidad == comp_antes and estado.inmunidad == 0, "los 2 errores no suman compatibilidad")
+	estado.sumar_compatibilidad(10.0)
+	comprobar(estado.compatibilidad == comp_antes + 10.0, "pasados los 2 errores, vuelve a sumar")
+	comprobar(not estado.usar_ayuda_cuadro(), "el cuadro solo se usa una vez por partida")
+	estado.sumar_compatibilidad(20.0, true)
+	estado.nueva_partida()
+	comprobar(not estado.ayuda_cuadro_usada and not estado.ayuda_libreta_usada and estado.inmunidad == 0 and estado.led_blanco == -1, "una partida nueva reinicia las ayudas")
+	estado.modo = 3
+	estado.nueva_partida(); estado.vigilancia_abierta = true
+	estado.usar_ayuda_cuadro()
+	comprobar(estado.inmunidad == 1, "modo 3: el cuadro perdona 1 error")
+	comprobar(estado.absorber_golpe() and not estado.absorber_golpe(), "modo 3: un solo golpe absorbido (la sombra o la silueta tampoco matan esa vez)")
+	estado.usar_ayuda_libreta()
+	comprobar(estado.compatibilidad == 84.0 and estado.led_blanco == 7, "modo 3: la libreta resta 15 (99 → 84) y marca el 8.º LED")
+	estado.modo = 1
+	estado.nueva_partida()
+
+	print("== Acusaciones de sangre (4 palabras en las placas + 1 en el cuadro)")
+	estado.modo_desbloqueado = 3
+	estado.muertes_previas = 0
+	estado.modo = 1
+	estado.nueva_partida()
+	comprobar(not estado.sangre_activa, "primera partida: sin acusación")
+	estado.registrar_muerte_previa()
+	estado.nueva_partida()
+	comprobar(estado.sangre_activa and not estado.mensaje_sangre_visto, "segunda partida tras una muerte: acusación activa")
+	comprobar(director.nombre_pasillo_macabro() == "pasillo_macabro", "modo 1 sin acusación: placas rasguñadas")
+	# modo 1: solo con la mancha y compatibilidad >= 80
+	estado.jugando = true
+	estado.fijar_compatibilidad(85.0)
+	director._acusacion("cuadro")
+	comprobar(not estado.mensaje_sangre_visto, "modo 1: una anomalía que no es la mancha no la dispara")
+	estado.fijar_compatibilidad(50.0)
+	director._acusacion("mancha")
+	comprobar(not estado.mensaje_sangre_visto, "modo 1: la mancha con compatibilidad < 80 % no la dispara")
+	estado.fijar_compatibilidad(85.0)
+	director._acusacion("mancha", false)
+	comprobar(not estado.mensaje_sangre_visto, "modo 1: una falsa alarma de la mancha no la gasta")
+	director._acusacion("mancha")
+	comprobar(estado.mensaje_sangre_visto and estado.palabra_cuadro_visible, "modo 1: mancha + compatibilidad >= 80 % + muerte previa: sale")
+	comprobar(director.nombre_pasillo_macabro() == "pasillo_macabro_haces", "modo 1: SABES · LO · QUE · HACES")
+	comprobar(director.sprite_palabra_cuadro().ends_with("sangre_cuadro_aqui.png"), "modo 1: «aquí» en el cuadro")
+	# modo 2
+	estado.modo = 2
+	estado.nueva_partida()
+	estado.jugando = true
+	estado.fijar_compatibilidad(85.0)
+	director._acusacion("mancha")
+	comprobar(estado.mensaje_sangre_visto, "modo 2: misma condición")
+	comprobar(director.nombre_pasillo_macabro() == "pasillo_macabro_quieres", "modo 2: NO · HACES · LO · QUE")
+	comprobar(director.sprite_palabra_cuadro().ends_with("sangre_cuadro_quieres.png"), "modo 2: «quieres» en el cuadro")
+	# modo 3: carteles normales -> NO · ERES · QUIEN · CREES + «ser» a la vez -> SABES · LO · QUE · PASÓ con el 3.er glifo
+	estado.modo = 3
+	estado.nueva_partida()
+	estado.jugando = true
+	comprobar(not estado.palabra_cuadro_visible and not estado.mensaje_sangre_visto, "modo 3: aún no ha salido nada")
+	comprobar(director.nombre_pasillo_macabro() == "pasillo_macabro_m3_previo", "modo 3: carteles normales hasta la primera frase")
+	director._acusacion("cuadro")
+	comprobar(estado.mensaje_sangre_visto and estado.palabra_cuadro_visible, "modo 3: con cualquier primera anomalía; palabra y placas a la vez")
+	comprobar(director.nombre_pasillo_macabro() == "pasillo_macabro_m3_eres", "modo 3: NO · ERES · QUIEN · CREES")
+	comprobar(director.sprite_palabra_cuadro().ends_with("sangre_cuadro_ser.png"), "modo 3: «ser» en el cuadro")
+	estado.solicitados = 3
+	comprobar(director.nombre_pasillo_macabro() == "pasillo_macabro_m3", "modo 3: con el 3.er glifo, SABES · LO · QUE · PASÓ")
+	estado.solicitados = 0
+	for n in ["pasillo_macabro", "pasillo_macabro_m3", "pasillo_macabro_m3_previo", "pasillo_macabro_haces", "pasillo_macabro_quieres", "pasillo_macabro_m3_eres"]:
+		comprobar(Recursos.fondo(n) != null, "existe el fondo %s" % n)
+	estado.muertes_previas = 0
+	estado.guardar_progreso()
+	estado.modo = 1
+	estado.nueva_partida()
+
+	print("== Borrar datos")
+	estado.modo_desbloqueado = 3
+	estado.estrellas = ["m1_bueno", "m2_malo"]
+	estado.muertes_previas = 2
+	estado.guia_hecha = true
+	estado.guardar_progreso()
+	comprobar(FileAccess.file_exists(estado.ruta_progreso), "borrar datos: antes existe el archivo de progreso")
+	estado.borrar_progreso()
+	comprobar(estado.modo_desbloqueado == 1 and estado.estrellas.is_empty() and estado.muertes_previas == 0 and not estado.guia_hecha, "borrar datos: todo vuelve a empezar")
+	comprobar(not FileAccess.file_exists(estado.ruta_progreso), "borrar datos: el archivo desaparece")
+
 	print("== Finales")
 	for muertes in [0, 1]:
 		estado.muertes = muertes

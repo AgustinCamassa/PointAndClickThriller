@@ -5,7 +5,7 @@ CARPETA_ORIGINALES debe contener (PNG ~1672x941, la recepción_reverso panorámi
   recepcion, recepcion_reverso, pasillo, pasillo_alterado, pasillo_secreto, laboratorio, oficina,
   habitacion_secreta (opcional: hab_tumbada y hab_sentada la sustituyen), vigilancia, ventana_recepcion (.png)
 Genera en assets/fondos: los fondos a 1280x720, cam_1 y cam_2 (filtro verde) y los monitores de Vigilancia.
-Retoques: recepción panorámica -> 16:9, placas VIG-01/LAB-04 del pasillo (las puertas conservan su color
+Retoques: recepción panorámica -> 16:9, placas del pasillo (VIG, ilegible, ACCESO, LAB; ver placas_pasillo.py; las puertas conservan su color
 original), huellas del pasillo alterado, pantallas de los monitores (laboratorio, pasillo y "sin señal" con
 filtro verde) y plantas borradas de la puerta doble de la vista de la ventana.
 Requiere Pillow, numpy y opencv-python.
@@ -78,17 +78,10 @@ def texto_placa(img, quad, texto, blur=0.8):
 
 
 def pasillo(orig):
-    def q(o, pts, z=4):
-        return [(o[0] + x / z, o[1] + y / z) for x, y in pts]
-    q1 = q((306, 91), [(160, 88), (392, 236), (358, 343), (158, 224)])
-    q4 = q((1174, 104), [(98, 288), (326, 158), (304, 302), (106, 428)])
-    # Las coordenadas son del original 1671x941
-    esc = orig.shape[1] / 1671.0
-    q1 = [(x * esc, y * esc) for x, y in q1]
-    q4 = [(x * esc, y * esc) for x, y in q4]
-    o = texto_placa(orig, q1, "VIG-01")
-    o = texto_placa(o, q4, "LAB-04")
-    return a1280(o)
+    """Pasillo principal: las placas se rehacen con placas_pasillo.py (VIG · ilegible · ACCESO · LAB, sin números)."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import placas_pasillo
+    return placas_pasillo.normal(a1280(orig))
 
 
 # --- plantas de la vista de la ventana ---------------------------------------------------------------

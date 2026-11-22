@@ -24,6 +24,7 @@ func _ready() -> void:
 	_capa_fondo = _nueva_capa()
 	_capa_anomalias = _nueva_capa()
 	_capa_alicia = _nueva_capa()
+	EstadoJuego.sangre_cambiada.connect(_sincronizar_palabra_cuadro)
 	_capa_zonas = _nueva_capa()
 	_capa_efectos = _nueva_capa()
 	_capa_modales = _nueva_capa()
@@ -104,6 +105,7 @@ func _construir_fondo(datos: Dictionary, textura: Texture2D) -> void:
 		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_capa_fondo.add_child(tr)
 		_fondo_tr = tr
+		_poner_palabra_cuadro()
 		return
 	var color := ColorRect.new()
 	color.color = datos["color"]
@@ -121,14 +123,45 @@ func _construir_fondo(datos: Dictionary, textura: Texture2D) -> void:
 	_capa_fondo.add_child(etiqueta)
 
 
+## La 5.ª palabra de la acusación (aquí / quieres / ser), escrita con sangre sobre el cuadro del pasillo. Solo existe en la vista macabra (aunque el cuadro
+## no sea clicable ahí) y sale a la vez que las placas de las puertas cambian de frase. La imagen es del tamaño del fondo (1280x720) y ya lleva la palabra
+## en perspectiva sobre el cristal del cuadro.
+func _poner_palabra_cuadro() -> void:
+	if _fondo_tr == null:
+		return
+	var viejo := _fondo_tr.get_node_or_null("palabra_cuadro")
+	if viejo != null:
+		_fondo_tr.remove_child(viejo)   # fuera ya, para que el nombre quede libre aunque queue_free tarde
+		viejo.queue_free()
+	if not (EstadoJuego.palabra_cuadro_visible and sala_id == "pasillo" and _es_macabra("pasillo")):
+		return
+	var t := TextureRect.new()
+	t.name = "palabra_cuadro"
+	t.texture = load(Director.sprite_palabra_cuadro())
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_SCALE
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fondo_tr.add_child(t)
+
+
+func _sincronizar_palabra_cuadro() -> void:
+	_actualizar_fondo()   # las placas cambian de frase
+	_poner_palabra_cuadro()
+
+
 func _construir_zonas(datos: Dictionary, con_fondo_real: bool) -> void:
-	var con_mancha := EstadoJuego.sala_actual == "pasillo" and Director.macabro("pasillo")
+	var clave := EstadoJuego.sala_actual + "_macabro"
+	var con_macabro := ZonasFondos.ZONAS.has(clave) and _es_macabra(EstadoJuego.sala_actual)
+	var vista_macabra := _es_macabra(EstadoJuego.sala_actual)
 	for h in datos["hotspots"]:
-		if con_mancha and not ZonasFondos.poligono("pasillo_macabro", h["id"]).is_empty():
-			# Con el fondo manchado las puertas están en otro sitio.
+		if h.get("solo_normal", false) and vista_macabra:
+			continue   # las ayudas ocultas (cuadro y libreta) solo se pueden usar con la vista normal
+		if con_macabro and not ZonasFondos.poligono(clave, h["id"]).is_empty():
+			# El fondo macabro es otro encuadre: sus puertas y objetos están en otro sitio (ZONAS["<sala>_macabro"]).
 			h = h.duplicate()
-			h["poly"] = ZonasFondos.poligono("pasillo_macabro", h["id"])
-			h["rect"] = ZonasFondos.rect("pasillo_macabro", h["id"])
+			h["poly"] = ZonasFondos.poligono(clave, h["id"])
+			h["rect"] = ZonasFondos.rect(clave, h["id"])
 		if h["rect"].size == Vector2.ZERO:
 			continue
 		var b := ZonaPoligono.new()
@@ -202,6 +235,9 @@ func _despertar() -> void:
 # --- Anomalías visibles en la sala ------------------------------------------------------------------
 
 func _rect_de(datos: Dictionary, id: String) -> Rect2:
+	var clave := sala_id + "_macabro"
+	if ZonasFondos.ZONAS.has(clave) and _es_macabra(sala_id) and not ZonasFondos.poligono(clave, id).is_empty():
+		return ZonasFondos.rect(clave, id)
 	for h in datos["hotspots"]:
 		if h["id"] == id:
 			return h["rect"]
@@ -255,9 +291,9 @@ func _actualizar_fondo() -> void:
 	var tex := _textura_sala(sala_id)
 	if tex != null and _fondo_tr.texture != tex:
 		_fondo_tr.texture = tex
-		if sala_id == "pasillo":
-			_vaciar(_capa_zonas)   # las puertas cambian de sitio con el fondo manchado
-			_construir_zonas(DatosSalas.obtener("pasillo"), true)
+		_vaciar(_capa_zonas)   # las puertas y objetos cambian de sitio con el fondo macabro (y las ayudas ocultas desaparecen con él)
+		_construir_zonas(DatosSalas.obtener(sala_id), true)
+		_poner_palabra_cuadro()   # la palabra del cuadro solo existe mientras la vista sea macabra
 		_destello_cambio()
 
 
@@ -300,12 +336,23 @@ func _geometria_entidad(fase: int) -> Dictionary:
 	return {"pies": Vector2(d["x"], f.y), "tam": Vector2(f.x * Alicia.ASPECTO_ENTIDAD, f.x)}
 
 
+func _es_macabra(id: String) -> bool:
+	## La sala se ve con su fondo macabro (hay anomalía; en el modo 3, al revés) y ese fondo existe.
+	return Director.macabro(id) and Recursos.fondo(id + "_macabro") != null
+
+
 func _textura_sala(id: String) -> Texture2D:
 	## Con una anomalía, el fondo macabro de la sala (si lo hay; en el modo 3, al revés: macabro siempre salvo con la anomalía); con el apagón, la versión oscurecida del que toque
 	## (luces apagadas, pantallas negras); si no existe, la normal.
 	var base := id
-	if Director.macabro(id) and Recursos.fondo(id + "_macabro") != null:
+	if _es_macabra(id):
 		base = id + "_macabro"
+		if id == "pasillo":
+			base = Director.nombre_pasillo_macabro()   # las acusaciones se escriben en las placas de las puertas
+		elif Director.invertido() and Recursos.fondo(base + "_m3") != null:
+			base += "_m3"   # modo 3: variante propia del fondo macabro
+		if Recursos.fondo(base) == null:
+			base = id + "_macabro"
 	if Director.apagon_activo():
 		var oscura := Recursos.fondo(base + "_apagon")
 		if oscura != null:
@@ -480,6 +527,21 @@ func _funcion(nombre: String) -> void:
 				EstadoJuego.obtener_tarjeta()
 				Sonido.reproducir("papel")
 				_abrir(PanelTexto.crear("Archivero", Textos.TARJETA))
+		"ayuda_cuadro":
+			if _es_macabra(sala_id):
+				return
+			if EstadoJuego.usar_ayuda_cuadro():
+				Interfaz.flash_blanco("Recuerdo haber estado ahí en algún momento.")
+			else:
+				Interfaz.mensaje("Una ciudad entre la niebla. Me suena, pero no sé de qué.", 3.5)
+		"ayuda_libreta":
+			if _es_macabra(sala_id):
+				return
+			if EstadoJuego.ayuda_libreta_usada:
+				Interfaz.mensaje("Mi libreta. No hay nada más que leer.", 3.0)
+			else:
+				EstadoJuego.usar_ayuda_libreta()
+				Interfaz.flash_blanco("Esta es mi libreta...")
 		"puerta_azul":
 			Interfaz.mensaje("No se abre desde este lado. No tiene picaporte.", 4.0)
 

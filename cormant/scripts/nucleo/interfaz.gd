@@ -34,6 +34,7 @@ var _depuracion: Label
 var _senales: Label            # LCD del detector: lista de señales activas
 var _leds: Array = []             # 9 LEDs del detector (apagados sin anomalías; parpadean 2 veces con cada señal nueva)
 var _animando_leds := false
+var _capa_flash: CanvasLayer
 var _claves_previas := {}         # señales de anomalía del fotograma anterior (para detectar las nuevas)
 var _leds_tween: Tween
 var _detector: Control            # detector de señales (sprite + LCD); solo visible tras conseguirlo
@@ -244,7 +245,7 @@ func _construir_notas() -> void:
 ##  - Los botones del dibujo (◀ ■ ▶) son decorativos; descartar / reportar / otra señal son tres botones en la franja
 ##    inferior de la pantalla (sobre Volver y Cerrar) que solo aparecen en Vigilancia.
 ## Las constantes salen de importar_detector.py (coordenadas del PNG original de 468x1040). Antena a la derecha, ruleta a la izquierda.
-const DETECTOR_TAM := Vector2(190, 422)
+const DETECTOR_TAM := Vector2(161.5, 358.7)   # 15 % menos que antes: así no tapa la libreta de la recepción
 const LCD_REL := Rect2(0.1175, 0.5635, 0.7991, 0.2923)
 const DET_ORIGINAL := Vector2(468, 1040)
 const LEDS_X := [107, 138, 169, 200, 231, 262, 293, 325, 356]
@@ -744,7 +745,7 @@ func _actualizar_alarma_detector(delta: float) -> void:
 	if _animando_leds:
 		return   # el aviso de una señal nueva ya los está haciendo parpadear
 	if not Director.pitidos_activos():
-		Sonido.reproducir("detector_alarma", -6.0)
+		Sonido.reproducir("detector_alarma", -9.0)
 	if _tween_alarma != null:
 		_tween_alarma.kill()
 	_poner_leds(0)
@@ -837,19 +838,56 @@ func nivel_leds() -> int:
 	## 60–69 → 6 (5 verdes + 1 amarillo); 70–79 → 7; 80–89 → 8; 90–100 → 9 (el rojo).
 	if Director.apagon_activo():
 		return _leds.size()   # durante el apagón el detector enciende todas las luces
-	var c := EstadoJuego.compatibilidad
-	if c < 1.0:
-		return 0
-	if c < 16.0:
-		return 1
-	if c < 30.0:
-		return 2
-	return clampi(int(floor(c / 10.0 + 0.0001)), 3, _leds.size())
+	return mini(EstadoJuego.nivel_detector(EstadoJuego.compatibilidad), _leds.size())
+
+
+## Aturdimiento de las ayudas ocultas: destello blanco intenso (~2 s) con un pitido y una frase en negro que se funde con la vista normal.
+## No pausa el juego (es un aturdimiento, no una pausa) y no bloquea el ratón.
+func flash_blanco(texto: String) -> void:
+	if _capa_flash != null and is_instance_valid(_capa_flash):
+		_capa_flash.queue_free()
+	_capa_flash = CanvasLayer.new()
+	_capa_flash.layer = layer + 2   # por encima del filtro rojo: tapa también el detector y los botones
+	add_child(_capa_flash)
+	var blanco := ColorRect.new()
+	blanco.color = Color(1, 1, 1, 1)
+	blanco.set_anchors_preset(Control.PRESET_FULL_RECT)
+	blanco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_capa_flash.add_child(blanco)
+	var frase := Label.new()
+	frase.text = texto
+	frase.set_anchors_preset(Control.PRESET_FULL_RECT)
+	frase.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	frase.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	frase.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	frase.add_theme_font_size_override("font_size", 38)
+	frase.add_theme_color_override("font_color", Color(0, 0, 0))
+	frase.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))   # contorno oscuro: se lee aunque el blanco se esté yendo
+	frase.add_theme_constant_override("outline_size", 3)
+	frase.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_capa_flash.add_child(frase)
+	Sonido.reproducir("aturdimiento", -6.0)
+	var capa := _capa_flash
+	var t := create_tween()
+	t.tween_interval(0.7)                                  # blanco pleno
+	t.tween_property(blanco, "modulate:a", 0.0, 1.3)       # y se funde con la vista normal (≈ 2 s en total)
+	t.parallel().tween_property(frase, "modulate:a", 0.0, 0.7).set_delay(0.6)   # el texto aguanta algo más que el blanco pleno
+	t.tween_callback(func():
+		if is_instance_valid(capa):
+			capa.queue_free())
 
 
 func _poner_leds(nivel: int) -> void:
 	for i in _leds.size():
 		_leds[i].visible = i < nivel
+		_pintar_led(i)
+
+
+## El LED marcado por la libreta se ve blanco hasta que el daño recibido iguala lo que restó; los demás, con su color natural.
+func _pintar_led(i: int) -> void:
+	var c: Color = Color(1, 1, 1) if i == EstadoJuego.led_blanco else LEDS_COLOR[i]
+	_leds[i].get_child(0).color = Color(c, 0.28 if i != EstadoJuego.led_blanco else 0.4)
+	_leds[i].get_child(1).color = c
 
 
 ## Señal nueva: parpadean 2 veces las luces del nivel de compatibilidad actual (solo la primera si es 0 %, que luego queda

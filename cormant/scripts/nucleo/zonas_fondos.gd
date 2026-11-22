@@ -14,14 +14,38 @@ const ZONAS := {
 		# «Darse la vuelta» queda por encima de la barra Volver/Cerrar para no solaparse con sus botones.
 		"vuelta": [Vector2(472, 560), Vector2(808, 560), Vector2(808, 634), Vector2(472, 634)],
 	},
+	# Fondos macabros: otro encuadre que el normal, así que sus puertas y objetos tienen zonas propias.
+	# Solo lo que cambia de sitio; el resto usa las zonas del fondo normal (medido sobre assets/fondos/<sala>_macabro.png).
+	"recepcion_macabro": {
+		"letrero": [Vector2(417, 251), Vector2(747, 251), Vector2(747, 328), Vector2(417, 328)],
+		"pc1": [Vector2(428, 343), Vector2(488, 343), Vector2(488, 384), Vector2(428, 384)],
+		"pc2": [Vector2(649, 343), Vector2(705, 343), Vector2(705, 384), Vector2(649, 384)],
+		"puerta_pasillo": [Vector2(817, 266), Vector2(935, 266), Vector2(935, 490), Vector2(817, 490)],
+		"puerta_izq": [Vector2(52, 184), Vector2(243, 244), Vector2(243, 522), Vector2(58, 572)],
+		"puerta_der": [Vector2(1130, 225), Vector2(1236, 184), Vector2(1236, 592), Vector2(1130, 566)],
+	},
+	"vigilancia_macabro": {
+		"ventana": [Vector2(352, 143), Vector2(928, 143), Vector2(928, 312), Vector2(352, 312)],
+		"monitores": [Vector2(388, 324), Vector2(850, 324), Vector2(850, 426), Vector2(388, 426)],
+		"cuaderno": [Vector2(832, 424), Vector2(900, 424), Vector2(900, 446), Vector2(832, 446)],
+		"archivero": [Vector2(935, 298), Vector2(1092, 298), Vector2(1092, 600), Vector2(935, 600)],
+	},
+	"laboratorio_macabro": {
+		"terminal": [Vector2(586, 318), Vector2(672, 318), Vector2(672, 372), Vector2(586, 372)],
+		"puerta_oficina": [Vector2(1149, 218), Vector2(1240, 190), Vector2(1240, 572), Vector2(1149, 520)],
+	},
 	"recepcion_reverso": {
 		"puerta_entrada": [Vector2(428, 302), Vector2(820, 302), Vector2(820, 560), Vector2(428, 560)],
+		# Libreta sobre la mesita de la derecha (ayuda oculta; solo con la vista normal).
+		"libreta": [Vector2(1056, 512), Vector2(1102, 512), Vector2(1102, 534), Vector2(1056, 534)],
 	},
 	"pasillo": {
 		"puerta_vigilancia": [Vector2(245, 150), Vector2(324, 172), Vector2(324, 600), Vector2(246, 684)],
 		"puerta_bloq1": [Vector2(418, 252), Vector2(460, 264), Vector2(460, 520), Vector2(418, 538)],
 		"puerta_bloq2": [Vector2(582, 290), Vector2(670, 290), Vector2(670, 468), Vector2(582, 468)],
 		"puerta_lab": [Vector2(910, 190), Vector2(984, 148), Vector2(984, 668), Vector2(920, 612)],
+		# Cuadro del muro derecho (ayuda oculta; solo con la vista normal).
+		"cuadro_pasillo": [Vector2(791, 264), Vector2(864, 227), Vector2(866, 435), Vector2(791, 407)],
 	},
 	# El fondo macabro del pasillo (`pasillo_macabro`) es otro encuadre: sus puertas están en otro sitio.
 	"pasillo_macabro": {

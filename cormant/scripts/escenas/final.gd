@@ -208,13 +208,34 @@ func _cierre_malo() -> void:
 	alicia.aparecer(0.2)
 	await get_tree().create_timer(2.0).timeout
 	# La silueta aparece siempre detrás de Alicia.
+	# Más alta que Alicia (antes 231 de alto, igual que ella) para que domine la escena.
 	var silueta := Alicia.new()
-	silueta.configurar("silueta", Vector2(570, 511), Vector2(92, 231), true)
+	var alto_entidad := 268.0
+	silueta.configurar("silueta", Vector2(566, 511), Vector2(alto_entidad * Alicia.ASPECTO_ENTIDAD, alto_entidad), true)
 	recorte.add_child(silueta)
 	recorte.move_child(silueta, alicia.get_index())
-	silueta.aparecer(0.05)
-	Sonido.reproducir("golpe_grave")
+	# Velo oscuro sobre toda la escena (debajo del filtro rojo): la sala se apaga mientras la entidad se forma.
+	var velo := ColorRect.new()
+	velo.color = Color(0, 0, 0, 0)
+	velo.size = Vector2(1280, 720)
+	velo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(velo)
 	move_child(_rojo, get_child_count() - 1)   # el filtro rojo tiñe también a Alicia y a la entidad, como al resto
+	# No aparece de golpe: se insinúa con la luz bajando, parpadea y por fin se vuelve sólida.
+	silueta.modulate = Color(0.5, 0.52, 0.58, 0.0)
+	var aparicion := create_tween()
+	aparicion.tween_property(velo, "color:a", 0.4, 0.7)
+	aparicion.parallel().tween_property(silueta, "modulate:a", 0.3, 0.7)
+	aparicion.tween_property(silueta, "modulate:a", 0.0, 0.06)
+	aparicion.tween_property(velo, "color:a", 0.55, 0.05)
+	aparicion.tween_property(silueta, "modulate:a", 0.6, 0.2)
+	aparicion.tween_property(silueta, "modulate:a", 0.1, 0.06)
+	aparicion.parallel().tween_property(velo, "color:a", 0.3, 0.06)
+	aparicion.tween_callback(Sonido.reproducir.bind("golpe_grave"))
+	aparicion.tween_property(silueta, "modulate", Color(1, 1, 1, Alicia.ALFA_ENTIDAD), 0.6)
+	aparicion.parallel().tween_property(velo, "color:a", 0.35, 0.6)
+	await aparicion.finished
+	await get_tree().create_timer(0.5).timeout
 	# Parpadeo de la imagen y telón negro.
 	var negro := ColorRect.new()
 	negro.color = Color.BLACK

@@ -167,10 +167,18 @@ def detector_bip():
 
 
 def detector_alarma():
-    """Pitido grave y suave (unos 620 Hz con leve trémolo), distinto de los 1900 Hz del aviso y de los 1000 Hz de la CAM 3."""
-    n = int(0.22*SR); tt = np.arange(n)/SR
-    x = (np.sin(2*np.pi*620*tt) + 0.3*np.sin(2*np.pi*930*tt))*(0.8+0.2*np.sin(2*np.pi*22*tt))*env_ad(n, 0.01, 0.12)
-    return lp(x, 2500)*0.6
+    """Pitido de alarma grave y redondo (unos 300 Hz, sin armónicos agudos ni trémolo): suena sin parar en el modo 3 y no debe cansar."""
+    n = int(0.3*SR); tt = np.arange(n)/SR
+    x = (np.sin(2*np.pi*300*tt) + 0.18*np.sin(2*np.pi*600*tt))*np.minimum(tt/0.04, 1.0)*np.exp(-tt/0.14)
+    return lp(x, 900)*0.7
+
+
+def aturdimiento():
+    """Pitido corto de aturdimiento (zumbido de oídos) para el flash blanco de las ayudas ocultas: ~2,9 kHz, suave y que se apaga."""
+    L = 1.9; n = int(L*SR); tt = np.arange(n)/SR
+    x = np.sin(2*np.pi*2900*tt)*np.minimum(tt/0.02, 1.0)*np.exp(-tt/0.7)
+    x += 0.25*np.sin(2*np.pi*4350*tt)*np.exp(-tt/0.4)
+    return lp(x, 6000)*0.5
 
 
 def tecla():
@@ -358,7 +366,7 @@ if __name__ == "__main__":
         "latido": (latido, 0.8), "musica_modo3": (musica_modo3, 0.5), "viento": (viento, 0.5), "susurro_derecha": (lambda: cerrar_bucle(susurro_derecha(), 10), 0.85),
     }
     efectos = {
-        "alerta_terminal": (alerta_terminal, 0.7), "detector_bip": (detector_bip, 0.6), "detector_alarma": (detector_alarma, 0.5), "apagon_inicio": (apagon_inicio, 0.9), "apagon_fin": (apagon_fin, 0.8), "tecla": (tecla, 0.5), "susurro_terminal": (susurro_terminal, 0.6),
+        "alerta_terminal": (alerta_terminal, 0.7), "detector_bip": (detector_bip, 0.6), "detector_alarma": (detector_alarma, 0.5), "aturdimiento": (aturdimiento, 0.45), "apagon_inicio": (apagon_inicio, 0.9), "apagon_fin": (apagon_fin, 0.8), "tecla": (tecla, 0.5), "susurro_terminal": (susurro_terminal, 0.6),
         "susurro_pasillo": (susurro_pasillo, 0.6), "estatica_breve": (estatica_breve, 0.6),
         "confirmacion": (confirmacion, 0.55), "error_terminal": (error_terminal, 0.65),
         "golpe_grave": (golpe_grave, 0.9), "advertencia_entidad": (advertencia_entidad, 0.8),

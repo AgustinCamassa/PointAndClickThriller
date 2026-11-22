@@ -40,6 +40,11 @@ func configurar(ids: Array, nueva_ := "") -> void:
 	queue_redraw()
 
 
+## Lo que tarda en dibujarse la línea desde que se entra al título con una estrella nueva (aparición 0,8 + 2,0 s, pausa 0,6 s y línea 3,0 s).
+func duracion_linea() -> float:
+	return 0.8 + 2.0 + 0.6 + 3.0
+
+
 func _fijar(id: String, v: float) -> void:
 	_alfa[id] = v
 

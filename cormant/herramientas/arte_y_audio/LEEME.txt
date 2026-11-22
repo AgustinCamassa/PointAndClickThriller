@@ -3,7 +3,9 @@ Generadores de los assets provisionales (Python 3 + Pillow, numpy, scipy y ffmpe
                            scripts/nucleo/zonas_fondos.gd (polígonos clicables, cuadro en la cámara del laboratorio)
   python3 exportar.py   -> la mancha y el cuadro provisionales en assets/sprites
   python3 audio.py      -> audio .ogg en assets/audio
-  python3 sangre.py     -> assets/sprites/sangre_sabes_quien_soy.png (texto de sangre del final del modo 3)
+  python3 sangre_mensajes.py (también) -> assets/sprites/menu_nueva_partida_mas.png (botón rojo «Nueva partida +» del menú de inicio)
+  python3 sangre.py     -> assets/sprites/sangre_sabes_quien_soy.png (texto de sangre del final del modo 3, letra de dedo de sangre_mensajes.py)
+  python3 sangre_mensajes.py -> sangre_cuadro_aqui / sangre_cuadro_quieres / sangre_cuadro_ser.png (1280x720: la 5.ª palabra en rojo, letra propia «escrita con el dedo» sin fuentes, en perspectiva sobre el cuadro del pasillo macabro). Las otras 4 palabras van en las placas: placas_pasillo.py, y luego fondos_apagon.py
 Motor: persp.py (caja 3D proyectada con un punto de fuga). Las salas están en salas3d.py: cada puerta/objeto
 se coloca en metros sobre una pared (decal "I" izquierda, "D" derecha, frontal = pared del fondo).
 Si cambias una puerta de sitio, vuelve a ejecutar exportar3d.py: las zonas clicables se regeneran solas.
@@ -27,7 +29,9 @@ FONDOS FOTORREALISTAS (actuales)
   python3 fondos_apagon.py                        -> assets/fondos/*_apagon.png (fondos oscurecidos del apagón; no toca los originales)
   python3 audio.py apagon_inicio apagon_fin       -> assets/audio/apagon_inicio.ogg y apagon_fin.ogg (apagón)
   python3 audio.py tecla                          -> assets/audio/tecla.ogg (teclado del PIN)
-  python3 audio.py detector_alarma                -> assets/audio/detector_alarma.ogg (pitido continuo con >= 90 %)
+  python3 audio.py detector_alarma                -> assets/audio/detector_alarma.ogg (pitido grave y suave continuo con >= 90 %; 300 Hz)
+  python3 audio.py aturdimiento                   -> assets/audio/aturdimiento.ogg (pitido corto del flash blanco de las ayudas ocultas)
+  python3 placas_pasillo.py                       -> pasillo_macabro.png y pasillo_macabro_m3.png (placas rasguñadas / SABES LO QUE PASÓ) desde base/pasillo_macabro_base.png; la placa del pasillo normal la hace importar_fondos.py (VIG, ilegible, ACCESO, LAB). Después fondos_apagon.py
   python3 audio.py detector_bip                    -> assets/audio/detector_bip.ogg (pitido del detector)
 
 fondo_titulo.py : genera el fondo del título (assets/fondos/titulo.png) con el cartel del edificio muy borroso y los tres

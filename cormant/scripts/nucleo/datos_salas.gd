@@ -20,6 +20,12 @@ static func _h(sala: String, id: String, etiqueta: String, accion: String, valor
 	}
 
 
+## Marca una zona que solo existe con la vista normal (no con el fondo macabro): las ayudas ocultas del cuadro y la libreta.
+static func _normal(h: Dictionary) -> Dictionary:
+	h["solo_normal"] = true
+	return h
+
+
 ## Sala a la que lleva el botón «Volver» de la barra inferior ("" = no hay vuelta atrás: inicio, habitación y pasillo alterado).
 const VOLVER_A := {
 	"recepcion_reverso": "recepcion",
@@ -74,6 +80,7 @@ static func obtener(id: String) -> Dictionary:
 				"hotspots": [
 					_h("recepcion_reverso", "puerta_entrada", "Puerta de entrada", "texto",
 						"Cerrada. No recuerdo haberla cruzado.", MARRON),
+					_normal(_h("recepcion_reverso", "libreta", "Libreta", "funcion", "ayuda_libreta", OBJETO)),
 				],
 			}
 		"pasillo":
@@ -88,6 +95,7 @@ static func obtener(id: String) -> Dictionary:
 					_h("pasillo", "puerta_bloq2", "Puerta cerrada", "texto",
 						"Cerrada. Junto a ella hay un rectángulo limpio en la pared, donde antes colgaba una placa.", MARRON),
 					_h("pasillo", "puerta_lab", "Laboratorio", "ir", "laboratorio", ROJO),
+					_normal(_h("pasillo", "cuadro_pasillo", "Cuadro", "funcion", "ayuda_cuadro", OBJETO)),
 				],
 			}
 		"vigilancia":
