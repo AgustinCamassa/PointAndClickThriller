@@ -838,6 +838,8 @@ func nivel_leds() -> int:
 	## 60–69 → 6 (5 verdes + 1 amarillo); 70–79 → 7; 80–89 → 8; 90–100 → 9 (el rojo).
 	if Director.apagon_activo():
 		return _leds.size()   # durante el apagón el detector enciende todas las luces
+	if EstadoJuego.inmunidad > 0:
+		return _leds.size()   # con la inmunidad del cuadro activa las 9 luces se ven llenas (en blanco, ver _pintar_led)
 	return mini(EstadoJuego.nivel_detector(EstadoJuego.compatibilidad), _leds.size())
 
 
@@ -885,8 +887,9 @@ func _poner_leds(nivel: int) -> void:
 
 ## El LED marcado por la libreta se ve blanco hasta que el daño recibido iguala lo que restó; los demás, con su color natural.
 func _pintar_led(i: int) -> void:
-	var c: Color = Color(1, 1, 1) if i == EstadoJuego.led_blanco else LEDS_COLOR[i]
-	_leds[i].get_child(0).color = Color(c, 0.28 if i != EstadoJuego.led_blanco else 0.4)
+	var blanco: bool = i == EstadoJuego.led_blanco or EstadoJuego.inmunidad > 0   # inmunidad del cuadro: todas en blanco
+	var c: Color = Color(1, 1, 1) if blanco else LEDS_COLOR[i]
+	_leds[i].get_child(0).color = Color(c, 0.4 if blanco else 0.28)
 	_leds[i].get_child(1).color = c
 
 

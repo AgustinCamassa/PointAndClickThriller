@@ -191,3 +191,27 @@ Cada pulsación destruye el menú anterior y construye el nuevo (`_mostrar_menu`
 - **Letra de la palabra del cuadro**: propia, sin ninguna fuente (por eso no hay licencias que respetar para vender el juego). `sangre_mensajes.py` define el esqueleto de cada letra (a, b, e, é, i, í, n, o, q, r, s, S, u, y y el punto) y la «escribe con el dedo»: pincel gordo y redondo, surcos paralelos que se secan hacia el final, pulso tembloroso, cada letra con su inclinación y altura, y unos pocos goterones. Para otra palabra hay que añadir los esqueletos de sus letras en `GLIFOS`. También la usa «Sabes quién soy...» del final del modo 3. Se eliminó la fuente Fraktur (`assets/fuentes/`).
 - `sangre.py` genera el texto del final del modo 3 (`sangre_sabes_quien_soy.png`, «Sabes quién soy...») con la misma letra de dedo (`sangre_mensajes.sprite_final`); sustituye a la versión anterior en DejaVu Serif. Mismo ancho (1210 px) que antes: `final.gd` lo pinta al 50 %. Se añadieron al esqueleto las letras S, b, n, o, y, é y el punto.
 - **Pruebas**: `prueba_humo.gd` tiene las secciones «Acusaciones de sangre» y «Borrar datos» (condiciones de los modos 1 y 2, modo 3, fondo y sprite elegidos, falsa alarma). **Sin ejecutar**: se escribió tras un reinicio del entorno en el que no había Godot; hay que lanzarla una vez. La única comprobación que falla es la intermitente «nunca el mismo tipo dos veces seguidas», de antes.
+
+## Fondo del título con el edificio macabro (23 de noviembre)
+- `assets/fondos/titulo_macabro.png` (farola encendida), `titulo_macabro_apagado.png` (farola apagada) y `titulo_macabro_cartel_1/2/3.png`; se generan con `herramientas/arte_y_audio/fondo_titulo_macabro.py` desde `fuentes/titulo_macabro_nitido.png` y `titulo_macabro_apagado_nitido.png`.
+- La imagen macabra se reencuadró a 1280x720 con una transformación afín (escala ≈1,037 horizontal / 1,069 vertical, desplazamiento ≈(-22,-36) px) hasta que puerta, valla, farola y luna coinciden con `titulo.png`. El tejado macabro es más alto (así viene en el diseño), el resto no se puede igualar píxel a píxel. Los bordes rellenados (≈34 px arriba) son cielo oscuro.
+- El cartel macabro conserva la nitidez progresiva (borroso → legible con los 3 modos).
+- `titulo.gd`: capas `_capa_normal`, `_capa_macabra`, `_capa_apagada`. Modo 3 desbloqueado y sin superar: alternan cada 4-7 s con interferencia (`_interferencia`). Con la estrella `m3`: fondo macabro con farola apagada fijo. Al volver justo tras superarlo: normal → estrellas → línea → parpadeo → macabro → la farola se apaga con parpadeos, a la vez que el velo rojo.
+- Menú principal con el modo 3 desbloqueado: «Nueva partida +» usa la imagen escrita a mano (`menu_nueva_partida_mas.png`).
+- SIN VERIFICAR EN GODOT (no había Godot en el contenedor): probar interferencia, transición tras el modo 3 y tiempos.
+- Cartel: borroso solo en los modos 1 y 2. Al superar el modo 2 (modo 3 desbloqueado) el logo «CORMANT · Medical Systems» se ve nítido siempre (nivel 3), en el fondo normal y en el macabro. El fondo base sigue con el cartel borroso, tapado por el recorte nítido.
+
+## Truco de desarrollo: tecla L en el título (solo compilaciones de depuración)
+Cada pulsación supera el siguiente modo sin jugarlo: L1 → modo 1 (estrellas m1_bueno y m1_malo, desbloquea el modo 2); L2 → modo 2 (m2_bueno y m2_malo, desbloquea el 3); L3 → modo 3 (estrella m3, 5.ª). Usa `EstadoJuego.trampa_superar_siguiente()`: mismas reglas y guardado en disco que una partida real, así que cuenta como jugado y terminado. Recarga el título con la animación de la última estrella. «Borrar datos» lo reinicia.
+
+## Estrellas tras el fundido y destello al pulsarlas (23 de noviembre)
+- Al fundirse el cielo (constelación completa), las estrellas y la línea se atenúan con el mismo fundido hasta 55 % de brillo (`ATENUACION_ESTRELLAS` en titulo.gd, `atenuacion` en constelacion.gd), para que no queden tan brillantes.
+- Pulsar una estrella conseguida: pantallazo blanco que empieza opaco y se atenúa en 3 s (`_destello`). No se activa con un menú emergente abierto.
+- SIN VERIFICAR EN GODOT: revisar que el fundido de las estrellas coincida con el del cielo y que el destello no tape los botones de forma molesta.
+
+## Ajustes del 23 de noviembre (tarde)
+- Detector: con la inmunidad del cuadro activa (`EstadoJuego.inmunidad > 0`) se encienden las 9 luces y todas en blanco; al gastarse las cargas vuelven a su color y nivel normales (`Interfaz.nivel_leds` / `_pintar_led`).
+- Título: pulsar una estrella no hacía nada porque el fondo a pantalla completa se tragaba el clic; ahora va en `_input`. Con la constelación completa: pantallazo blanco con `TEXTO_ESTRELLA` («texto de historia aquí», provisional) en la posición de los subtítulos, 4 s, y se funde con la vista normal en 1,5 s. Sin completar: destello blanco de 3 s como antes.
+- Fundido rojo del modo 3 más suave (`VELO_ALFA` 0,62 → 0,36) con viñeta oscura en las esquinas (visión de ojo) que entra con el mismo fundido.
+- Alternancia normal/macabro (modo 3 desbloqueado sin superar): en el macabro la farola titila (capa `_capa_apagada` que aparece y desaparece al azar); en el normal queda encendida. Superado: farola apagada fija.
+- SIN VERIFICAR EN GODOT.

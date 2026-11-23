@@ -19,6 +19,7 @@ var nueva := ""                   # estrella que aparece con fundido al entrar a
 var origen := Vector2(470, 34)   # dentro del cielo del fondo: sobre el tejado, a la izquierda de la luna
 var _alfa := {}                   # id -> opacidad actual
 var _linea := 0.0
+var atenuacion := 1.0             # 1 = brillo normal; baja con el fundido final para que las estrellas no queden tan brillantes
 var _t := 0.0
 
 
@@ -43,6 +44,22 @@ func configurar(ids: Array, nueva_ := "") -> void:
 ## Lo que tarda en dibujarse la línea desde que se entra al título con una estrella nueva (aparición 0,8 + 2,0 s, pausa 0,6 s y línea 3,0 s).
 func duracion_linea() -> float:
 	return 0.8 + 2.0 + 0.6 + 3.0
+
+
+## Atenúa las estrellas y la línea hasta `valor` en `duracion` segundos (lo usa el fundido del título).
+func atenuar(valor: float, duracion: float) -> void:
+	if duracion <= 0.0:
+		atenuacion = valor
+		return
+	create_tween().tween_property(self, "atenuacion", valor, duracion)
+
+
+## ¿Cae el punto sobre una estrella ya conseguida? (para el destello al pulsarla)
+func estrella_en(punto: Vector2) -> bool:
+	for i in IDS.size():
+		if conseguidas.has(IDS[i]) and punto.distance_to(posicion(i)) <= 16.0:
+			return true
+	return false
 
 
 func _fijar(id: String, v: float) -> void:
@@ -75,14 +92,14 @@ func _draw() -> void:
 				break
 			var a := posicion(i)
 			var b := posicion(i + 1)
-			draw_line(a, a.lerp(b, tramo), Color(1, 1, 1, 0.85), 1.6, true)
+			draw_line(a, a.lerp(b, tramo), Color(1, 1, 1, 0.85 * atenuacion), 1.6, true)
 	for i in IDS.size():
 		var alfa: float = _alfa.get(IDS[i], 0.0)
 		if alfa <= 0.0:
 			continue
 		var p := posicion(i)
 		var brillo := 0.85 + 0.15 * sin(_t * 1.7 + i * 1.9)
-		var a := alfa * brillo
+		var a := alfa * brillo * atenuacion
 		draw_circle(p, 18.0, Color(0.75, 0.85, 1.0, 0.06 * a))
 		draw_circle(p, 11.0, Color(0.8, 0.9, 1.0, 0.13 * a))
 		draw_circle(p, 7.0, Color(0.9, 0.95, 1.0, 0.3 * a))

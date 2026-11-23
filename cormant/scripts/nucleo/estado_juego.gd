@@ -222,6 +222,27 @@ func superar_modo() -> int:
 	return desbloqueo_reciente
 
 
+## TRUCO de desarrollo (tecla L en el título): da por superado el siguiente modo sin jugarlo, con los dos finales (bueno y malo; el 3 tiene uno solo).
+## Usa las mismas reglas que una partida real: añade las estrellas, desbloquea el modo siguiente y guarda el progreso en disco.
+## Devuelve el modo superado (1–3) o 0 si ya estaban los tres.
+func trampa_superar_siguiente() -> int:
+	var hecho := modos_superados_de(estrellas)
+	if hecho >= MODOS.size():
+		return 0
+	var m := hecho + 1
+	var ids: Array = ["m3"] if m >= MODOS.size() else ["m%d_bueno" % m, "m%d_malo" % m]
+	desbloqueo_reciente = 0
+	for id in ids:
+		if not estrellas.has(id):
+			estrellas.append(id)
+			estrella_reciente = id
+	if m < MODOS.size() and modo_desbloqueado < m + 1:
+		modo_desbloqueado = m + 1
+		desbloqueo_reciente = modo_desbloqueado
+	guardar_progreso()
+	return m
+
+
 func comprobar_pin(digitos: Array) -> bool:
 	if digitos.size() != pin.size():
 		return false
